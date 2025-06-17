@@ -626,11 +626,16 @@ if __name__ == '__main__':
                 analyze_conversation(history[0])
         else:
             print("Usage:")
-            print("  python cgpt.py list [count]          - List conversations")
-            print("  python cgpt.py export <number> [--debug] - Export conversation by number")
-            print("  python cgpt.py debug <number>        - Show conversation structure details")
-            print("  python cgpt.py search <term> [--export] [--debug] - Search for conversations")
-            print("  python cgpt.py info                  - Show information about the database")
+            print("  python cgpt.py list [count]                                - List conversations")
+            print("  python cgpt.py export <number> [--debug]                   - Export conversation by number")
+            print("  python cgpt.py debug <number>                              - Show conversation structure details")
+            print("  python cgpt.py search <term> [--content] [--export] [--n=X] [--debug] - Search for conversations")
+            print("  python cgpt.py info                                        - Show information about the database")
+            print("\nOptions:")
+            print("  --content  : Search within message content (not just titles)")
+            print("  --export   : Export the found conversation(s)")
+            print("  --n=X      : Export the Xth conversation from search results (default: 1st)")
+            print("  --debug    : Show detailed debug information")
     else:
         # Try interactive mode if no arguments provided
         try:
@@ -646,6 +651,8 @@ if __name__ == '__main__':
                 # If simple mode fails, show usage
                 print(f"Error in simple mode: {e}")
                 print("\nUsage:")
-                print("  python cgpt.py list [count]       - List conversations")
-                print("  python cgpt.py export <number>    - Export conversation by number")
-                print("  python cgpt.py search <term>      - Search for conversations")
+                print("  python cgpt.py list [count]                                - List conversations")
+                print("  python cgpt.py export <number> [--debug]                   - Export conversation by number")
+                print("  python cgpt.py debug <number>                              - Show conversation structure details")
+                print("  python cgpt.py search <term> [--content] [--export] [--n=X] [--debug] - Search for conversations")
+                print("  python cgpt.py info                                        - Show information about the database")
