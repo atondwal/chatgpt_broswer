@@ -257,10 +257,15 @@ def main(stdscr):
         stdscr.getch()
 
 if __name__ == '__main__':
-    # Try using curses, but fall back to simple mode if it fails
-    try:
-        curses.wrapper(main)
-    except Exception as e:
-        print(f"Error initializing curses: {e}")
-        print("Falling back to simple mode...\n")
-        simple_mode(HISTORY_PATH)
+    # Always use simple mode directly for now since curses has issues
+    # This avoids the terminal issues that can happen when curses fails
+    print("Using simple mode for ChatGPT conversation browser\n")
+    simple_mode(HISTORY_PATH)
+    
+    # Original code with curses (commented out for now):
+    # try:
+    #     curses.wrapper(main)
+    # except Exception as e:
+    #     print(f"Error initializing curses: {e}")
+    #     print("Falling back to simple mode...\n")
+    #     simple_mode(HISTORY_PATH)
