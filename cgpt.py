@@ -612,11 +612,19 @@ if __name__ == '__main__':
             print(f"Conversation database: {HISTORY_PATH}")
             print(f"Total conversations: {len(history)}")
             
-            # Count messages
+            # Count messages from all formats
             total_msgs = 0
             for convo in history:
+                # Direct messages list
                 if 'messages' in convo and isinstance(convo['messages'], list):
                     total_msgs += len(convo['messages'])
+                # Mapping structure
+                elif 'mapping' in convo and isinstance(convo['mapping'], dict):
+                    msg_count = 0
+                    for node_id, node in convo['mapping'].items():
+                        if 'message' in node and node['message']:
+                            msg_count += 1
+                    total_msgs += msg_count
             
             print(f"Total messages: {total_msgs}")
             
