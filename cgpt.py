@@ -527,16 +527,84 @@ if __name__ == '__main__':
         elif sys.argv[1] == "search" and len(sys.argv) > 2:
             # Search for conversations
             term = sys.argv[2].lower()
-            results = [c for c in history if term in c.get('title', '').lower()]
+            search_content = "--content" in sys.argv
+            
+            if search_content:
+                # Search through message content (slower but more thorough)
+                results = []
+                print(f"Searching through conversation content for '{term}'...")
+                for i, convo in enumerate(history):
+                    # Check title first
+                    if term in convo.get('title', '').lower():
+                        results.append((convo, "title match"))
+                        continue
+                        
+                    # Then check message content
+                    found = False
+                    msgs = []
+                    
+                    # Handle different conversation formats
+                    if 'messages' in convo and isinstance(convo['messages'], list):
+                        msgs = convo['messages']
+                    elif 'mapping' in convo and isinstance(convo['mapping'], dict):
+                        for node_id, node in convo['mapping'].items():
+                            if 'message' in node and node['message']:
+                                msgs.append(node['message'])
+                    
+                    # Search in message content
+                    matching_text = []
+                    for msg in msgs:
+                        try:
+                            content = get_message_content(msg)
+                            if term in content.lower():
+                                # Store a short context around the match
+                                idx = content.lower().find(term)
+                                start = max(0, idx - 40)
+                                end = min(len(content), idx + len(term) + 40)
+                                context = content[start:end]
+                                if start > 0:
+                                    context = "..." + context
+                                if end < len(content):
+                                    context = context + "..."
+                                matching_text.append(context)
+                                found = True
+                        except:
+                            continue
+                    
+                    if found:
+                        # First match with context
+                        context = matching_text[0] if matching_text else "content match"
+                        results.append((convo, context))
+            else:
+                # Search only in titles (faster)
+                results = [(c, "title match") for c in history if term in c.get('title', '').lower()]
+            
+            # Display results
             if results:
                 print(f"Found {len(results)} conversations matching '{term}':")
-                for i, convo in enumerate(results[:20]):
-                    print(f"{i+1}. {convo.get('title', f'Conversation {convo.get('id', i)}')}")
+                for i, (convo, match_context) in enumerate(results[:20]):
+                    title = convo.get('title', f"Conversation {convo.get('id', i)}")
+                    if search_content and match_context != "title match":
+                        print(f"{i+1}. {title}")
+                        print(f"   Match: \"{match_context}\"")
+                    else:
+                        print(f"{i+1}. {title}")
                 
-                # If --export flag is present, export the first result
-                if "--export" in sys.argv and results:
-                    print("\nExporting first matching conversation:")
-                    export_conversation([results[0]], 0, "--debug" in sys.argv)
+                # If --export flag is present, export the specified or first result
+                if "--export" in sys.argv:
+                    idx = 0
+                    for arg in sys.argv:
+                        if arg.startswith("--n="):
+                            try:
+                                idx = int(arg.split("=")[1]) - 1
+                                if idx < 0 or idx >= len(results):
+                                    print(f"\nError: Index {idx+1} out of range (1-{len(results)})")
+                                    idx = 0
+                            except:
+                                pass
+                    
+                    print(f"\nExporting {'first' if idx == 0 else f'#{idx+1}'} matching conversation:")
+                    export_conversation([results[idx][0]], 0, "--debug" in sys.argv)
             else:
                 print(f"No conversations found matching '{term}'")
         elif sys.argv[1] == "info":
