@@ -20,11 +20,15 @@ from chatgpt_browser import (
     Conversation, ConversationLoader, ConversationSearcher, 
     ConversationExporter, MessageRole
 )
+from conversation_tree import (
+    ConversationOrganizer, TreeNode, NodeType, ConversationMetadata
+)
 
 
 class ViewMode(Enum):
     """Available view modes in the TUI."""
     CONVERSATION_LIST = "list"
+    CONVERSATION_TREE = "tree"
     CONVERSATION_DETAIL = "detail"
     SEARCH = "search"
     HELP = "help"
@@ -42,6 +46,8 @@ class ColorPair(Enum):
     SYSTEM_MESSAGE = 8
     SEARCH_HIGHLIGHT = 9
     ERROR = 10
+    FOLDER = 11
+    CONVERSATION_TREE = 12
 
 
 @dataclass
@@ -581,6 +587,217 @@ class HelpView:
             pass
 
 
+class TreeListView:
+    """Manages the conversation tree view with hierarchical folders."""
+    
+    def __init__(self, stdscr, dimensions: WindowDimensions):
+        self.stdscr = stdscr
+        self.dims = dimensions
+        self.tree_items: List[Tuple[TreeNode, Optional[Conversation], int]] = []  # (node, conversation, depth)
+        self.current_index = 0
+        self.scroll_offset = 0
+        self.search_term = ""
+        
+    def set_tree_items(self, organized_conversations: List[Tuple[TreeNode, Optional[Conversation]]]) -> None:
+        """Set the tree items to display with depth calculation."""
+        self.tree_items = []
+        
+        # Calculate depth for each item based on its path
+        for node, conversation in organized_conversations:
+            # Count path separators to determine depth
+            depth = node.path.count('/') - 1 if node.path.startswith('/') else 0
+            depth = max(0, depth)  # Ensure non-negative
+            
+            # For conversations, they're at the same level as their parent folder
+            if node.node_type == NodeType.CONVERSATION and node.parent_id:
+                depth = max(0, depth)
+            
+            self.tree_items.append((node, conversation, depth))
+            
+        self.current_index = 0
+        self.scroll_offset = 0
+
+    def filter_tree_items(self, search_term: str) -> None:
+        """Filter tree items based on search term."""
+        # Note: For simplicity, we'll just store the search term
+        # In a full implementation, this would filter the tree while maintaining structure
+        self.search_term = search_term.lower()
+        self.current_index = 0
+        self.scroll_offset = 0
+
+    def move_up(self) -> None:
+        """Move selection up."""
+        if self.current_index > 0:
+            self.current_index -= 1
+            self._adjust_scroll()
+
+    def move_down(self) -> None:
+        """Move selection down."""
+        if self.current_index < len(self.tree_items) - 1:
+            self.current_index += 1
+            self._adjust_scroll()
+
+    def page_up(self) -> None:
+        """Move up by one page."""
+        page_size = self.dims.height - 2
+        self.current_index = max(0, self.current_index - page_size)
+        self._adjust_scroll()
+
+    def page_down(self) -> None:
+        """Move down by one page."""
+        page_size = self.dims.height - 2
+        max_index = len(self.tree_items) - 1
+        self.current_index = min(max_index, self.current_index + page_size)
+        self._adjust_scroll()
+
+    def get_selected_item(self) -> Optional[Tuple[TreeNode, Optional[Conversation]]]:
+        """Get the currently selected tree item."""
+        if 0 <= self.current_index < len(self.tree_items):
+            node, conversation, _ = self.tree_items[self.current_index]
+            return (node, conversation)
+        return None
+
+    def toggle_folder(self) -> bool:
+        """
+        Toggle folder expansion/collapse.
+        
+        Returns:
+            True if a folder was toggled, False otherwise
+        """
+        if 0 <= self.current_index < len(self.tree_items):
+            node, _, _ = self.tree_items[self.current_index]
+            if node.node_type == NodeType.FOLDER:
+                node.expanded = not node.expanded
+                return True
+        return False
+
+    def _adjust_scroll(self) -> None:
+        """Adjust scroll offset to keep selection visible."""
+        visible_lines = self.dims.height - 2
+        
+        if self.current_index < self.scroll_offset:
+            self.scroll_offset = self.current_index
+        elif self.current_index >= self.scroll_offset + visible_lines:
+            self.scroll_offset = self.current_index - visible_lines + 1
+
+    def draw(self) -> None:
+        """Draw the tree view."""
+        try:
+            # Clear the area
+            for y in range(self.dims.start_y, self.dims.start_y + self.dims.height):
+                self.stdscr.move(y, self.dims.start_x)
+                self.stdscr.clrtoeol()
+
+            # Draw header
+            header = f"Conversation Tree ({len(self.tree_items)})"
+            if self.search_term:
+                header += f" - Filtered by: '{self.search_term}'"
+            
+            self.stdscr.attron(curses.color_pair(ColorPair.HEADER.value))
+            self.stdscr.addstr(
+                self.dims.start_y, 
+                self.dims.start_x, 
+                header[:self.dims.width]
+            )
+            self.stdscr.attroff(curses.color_pair(ColorPair.HEADER.value))
+
+            # Draw tree items
+            visible_lines = self.dims.height - 2
+            for i in range(visible_lines):
+                list_index = self.scroll_offset + i
+                if list_index >= len(self.tree_items):
+                    break
+
+                y = self.dims.start_y + 1 + i
+                node, conversation, depth = self.tree_items[list_index]
+                
+                # Create tree visualization
+                indent = "  " * depth
+                
+                if node.node_type == NodeType.FOLDER:
+                    # Folder with expand/collapse indicator
+                    expand_char = "▼" if node.expanded else "▶"
+                    folder_icon = "📁"
+                    prefix = f"{indent}{expand_char} {folder_icon} "
+                    name = node.name
+                    
+                    # Show folder with child count
+                    child_count = len(node.children)
+                    if child_count > 0:
+                        name += f" ({child_count})"
+                        
+                    color = ColorPair.FOLDER.value
+                else:
+                    # Conversation
+                    conv_icon = "💬"
+                    prefix = f"{indent}  {conv_icon} "
+                    
+                    # Use custom title or conversation title
+                    if conversation:
+                        name = node.name if node.name != node.id else conversation.title
+                        msg_count = f" ({conversation.message_count})"
+                        name += msg_count
+                    else:
+                        name = f"{node.name} [Not Found]"
+                        
+                    color = ColorPair.CONVERSATION_TREE.value
+
+                # Selection indicator
+                if list_index == self.current_index:
+                    prefix = "▶ " + prefix[2:]
+                else:
+                    prefix = "  " + prefix[2:]
+
+                # Truncate if necessary
+                max_width = self.dims.width - len(prefix) - 1
+                if len(name) > max_width:
+                    name = name[:max_width - 3] + "..."
+                
+                line = f"{prefix}{name}"
+                
+                # Apply selection highlighting
+                if list_index == self.current_index:
+                    self.stdscr.attron(curses.color_pair(ColorPair.SELECTED.value))
+                    self.stdscr.addstr(y, self.dims.start_x, line[:self.dims.width])
+                    self.stdscr.attroff(curses.color_pair(ColorPair.SELECTED.value))
+                else:
+                    self.stdscr.attron(curses.color_pair(color))
+                    self.stdscr.addstr(y, self.dims.start_x, line[:self.dims.width])
+                    self.stdscr.attroff(curses.color_pair(color))
+
+            # Draw scroll indicator if needed
+            if len(self.tree_items) > visible_lines:
+                self._draw_scroll_indicator()
+
+        except curses.error:
+            pass
+
+    def _draw_scroll_indicator(self) -> None:
+        """Draw a scroll indicator on the right side."""
+        if self.dims.width < 3:
+            return
+            
+        visible_lines = self.dims.height - 2
+        total_lines = len(self.tree_items)
+        
+        if total_lines <= visible_lines:
+            return
+            
+        # Calculate scroll bar position
+        scroll_ratio = self.scroll_offset / (total_lines - visible_lines)
+        scroll_position = int(scroll_ratio * (visible_lines - 1))
+        
+        x = self.dims.start_x + self.dims.width - 1
+        
+        for i in range(visible_lines):
+            y = self.dims.start_y + 1 + i
+            char = "█" if i == scroll_position else "░"
+            try:
+                self.stdscr.addstr(y, x, char)
+            except curses.error:
+                pass
+
+
 class ChatGPTTUI:
     """Main TUI application class."""
     
@@ -598,6 +815,7 @@ class ChatGPTTUI:
         self.stdscr = None
         self.status_bar: Optional[StatusBar] = None
         self.list_view: Optional[ConversationListView] = None
+        self.tree_view: Optional[TreeListView] = None
         self.detail_view: Optional[ConversationDetailView] = None
         self.search_view: Optional[SearchView] = None
         self.help_view: Optional[HelpView] = None
@@ -605,6 +823,7 @@ class ChatGPTTUI:
         # Services
         self.loader = ConversationLoader(debug=debug)
         self.searcher = ConversationSearcher(debug=debug)
+        self.organizer: Optional[ConversationOrganizer] = None
 
     def run(self) -> None:
         """Run the TUI application."""
@@ -657,6 +876,8 @@ class ChatGPTTUI:
             curses.init_pair(ColorPair.SYSTEM_MESSAGE.value, curses.COLOR_YELLOW, -1)
             curses.init_pair(ColorPair.SEARCH_HIGHLIGHT.value, curses.COLOR_BLACK, curses.COLOR_YELLOW)
             curses.init_pair(ColorPair.ERROR.value, curses.COLOR_WHITE, curses.COLOR_RED)
+            curses.init_pair(ColorPair.FOLDER.value, curses.COLOR_BLUE, -1)
+            curses.init_pair(ColorPair.CONVERSATION_TREE.value, curses.COLOR_GREEN, -1)
 
     def _init_ui(self) -> None:
         """Initialize UI components."""
@@ -671,6 +892,7 @@ class ChatGPTTUI:
         
         # Initialize views
         self.list_view = ConversationListView(self.stdscr, content_dims)
+        self.tree_view = TreeListView(self.stdscr, content_dims)
         self.detail_view = ConversationDetailView(self.stdscr, content_dims)
         self.search_view = SearchView(self.stdscr, WindowDimensions(1, width, 0, 0))
         self.help_view = HelpView(self.stdscr, content_dims)
@@ -690,6 +912,11 @@ class ChatGPTTUI:
             
             self.conversations = self.loader.load_conversations(path)
             self.list_view.set_conversations(self.conversations)
+            
+            # Initialize conversation organizer
+            self.organizer = ConversationOrganizer(path, debug=self.debug)
+            organized_conversations = self.organizer.get_organized_conversations(self.conversations)
+            self.tree_view.set_tree_items(organized_conversations)
             
             if self.conversations:
                 self.status_bar.show_message(f"Loaded {len(self.conversations)} conversations")
@@ -721,6 +948,10 @@ class ChatGPTTUI:
             self.list_view.draw()
             if hasattr(self, '_search_active') and self._search_active:
                 self.search_view.draw()
+        elif self.mode == ViewMode.CONVERSATION_TREE:
+            self.tree_view.draw()
+            if hasattr(self, '_search_active') and self._search_active:
+                self.search_view.draw()
         elif self.mode == ViewMode.CONVERSATION_DETAIL:
             self.detail_view.draw()
         elif self.mode == ViewMode.HELP:
@@ -733,13 +964,18 @@ class ChatGPTTUI:
 
     def _get_current_shortcuts(self) -> Dict[str, str]:
         """Get shortcuts for the current mode."""
-        base_shortcuts = {"q": "quit", "h": "help"}
+        base_shortcuts = {"q": "quit", "h": "help", "t": "tree", "l": "list"}
         
         if self.mode == ViewMode.CONVERSATION_LIST:
             if hasattr(self, '_search_active') and self._search_active:
                 return {"Enter": "search", "Esc": "cancel", **base_shortcuts}
             else:
                 return {"Enter": "view", "/": "search", "↑↓": "navigate", **base_shortcuts}
+        elif self.mode == ViewMode.CONVERSATION_TREE:
+            if hasattr(self, '_search_active') and self._search_active:
+                return {"Enter": "search", "Esc": "cancel", **base_shortcuts}
+            else:
+                return {"Enter": "view", "Space": "toggle", "/": "search", "↑↓": "navigate", **base_shortcuts}
         elif self.mode == ViewMode.CONVERSATION_DETAIL:
             return {"Esc": "back", "↑↓": "scroll", "PgUp/Dn": "page", **base_shortcuts}
         elif self.mode == ViewMode.HELP:
@@ -751,16 +987,22 @@ class ChatGPTTUI:
         """Handle user input based on current mode."""
         # Global shortcuts
         if ch == ord('q'):
-            if self.mode == ViewMode.CONVERSATION_LIST and not getattr(self, '_search_active', False):
+            if (self.mode == ViewMode.CONVERSATION_LIST or self.mode == ViewMode.CONVERSATION_TREE) and not getattr(self, '_search_active', False):
                 self.running = False
             else:
                 self._go_back()
         elif ch == ord('h') or ch == curses.KEY_F1:
             self._show_help()
+        elif ch == ord('t'):
+            self._switch_to_tree_view()
+        elif ch == ord('l'):
+            self._switch_to_list_view()
         elif ch == 27:  # ESC
             self._go_back()
         elif self.mode == ViewMode.CONVERSATION_LIST:
             self._handle_list_input(ch)
+        elif self.mode == ViewMode.CONVERSATION_TREE:
+            self._handle_tree_input(ch)
         elif self.mode == ViewMode.CONVERSATION_DETAIL:
             self._handle_detail_input(ch)
 
@@ -794,6 +1036,38 @@ class ChatGPTTUI:
             elif ch == ord('/'):
                 self._start_search()
 
+    def _handle_tree_input(self, ch: int) -> None:
+        """Handle input in conversation tree mode."""
+        if hasattr(self, '_search_active') and self._search_active:
+            # Search mode
+            if ch == 10 or ch == 13:  # Enter
+                self._apply_search_tree()
+            elif self.search_view.handle_char(ch):
+                # Update filter in real-time
+                self.tree_view.filter_tree_items(self.search_view.search_term)
+        else:
+            # Normal tree navigation
+            if ch == curses.KEY_UP or ch == ord('k'):
+                self.tree_view.move_up()
+            elif ch == curses.KEY_DOWN or ch == ord('j'):
+                self.tree_view.move_down()
+            elif ch == curses.KEY_PPAGE:
+                self.tree_view.page_up()
+            elif ch == curses.KEY_NPAGE:
+                self.tree_view.page_down()
+            elif ch == curses.KEY_HOME:
+                self.tree_view.current_index = 0
+                self.tree_view._adjust_scroll()
+            elif ch == curses.KEY_END:
+                self.tree_view.current_index = len(self.tree_view.tree_items) - 1
+                self.tree_view._adjust_scroll()
+            elif ch == 10 or ch == 13:  # Enter
+                self._view_selected_tree_item()
+            elif ch == ord(' '):  # Space
+                self._toggle_tree_folder()
+            elif ch == ord('/'):
+                self._start_search()
+
     def _handle_detail_input(self, ch: int) -> None:
         """Handle input in conversation detail mode."""
         if ch == curses.KEY_UP or ch == ord('k'):
@@ -817,12 +1091,43 @@ class ChatGPTTUI:
         curses.curs_set(0)  # Hide cursor
         self.list_view.filter_conversations(self.search_view.search_term)
 
+    def _apply_search_tree(self) -> None:
+        """Apply the current search to tree view."""
+        self._search_active = False
+        curses.curs_set(0)  # Hide cursor
+        self.tree_view.filter_tree_items(self.search_view.search_term)
+
     def _view_selected_conversation(self) -> None:
         """View the selected conversation."""
         conversation = self.list_view.get_selected_conversation()
         if conversation:
             self.detail_view.set_conversation(conversation)
             self.mode = ViewMode.CONVERSATION_DETAIL
+
+    def _view_selected_tree_item(self) -> None:
+        """View the selected tree item."""
+        item = self.tree_view.get_selected_item()
+        if item:
+            node, conversation = item
+            if conversation:  # It's a conversation
+                self.detail_view.set_conversation(conversation)
+                self.mode = ViewMode.CONVERSATION_DETAIL
+
+    def _toggle_tree_folder(self) -> None:
+        """Toggle folder expansion in tree view."""
+        if self.tree_view.toggle_folder():
+            # Refresh tree display with updated expansion state
+            if self.organizer:
+                organized_conversations = self.organizer.get_organized_conversations(self.conversations)
+                self.tree_view.set_tree_items(organized_conversations)
+
+    def _switch_to_tree_view(self) -> None:
+        """Switch to tree view mode."""
+        self.mode = ViewMode.CONVERSATION_TREE
+
+    def _switch_to_list_view(self) -> None:
+        """Switch to list view mode."""
+        self.mode = ViewMode.CONVERSATION_LIST
 
     def _show_help(self) -> None:
         """Show the help screen."""
@@ -834,12 +1139,17 @@ class ChatGPTTUI:
             self._search_active = False
             curses.curs_set(0)
             self.search_view.clear()
-            self.list_view.filter_conversations("")  # Clear filter
+            if self.mode == ViewMode.CONVERSATION_LIST:
+                self.list_view.filter_conversations("")  # Clear filter
+            elif self.mode == ViewMode.CONVERSATION_TREE:
+                self.tree_view.filter_tree_items("")  # Clear filter
         elif self.mode == ViewMode.CONVERSATION_DETAIL:
             self.mode = ViewMode.CONVERSATION_LIST
         elif self.mode == ViewMode.HELP:
             self.mode = ViewMode.CONVERSATION_LIST
         elif self.mode == ViewMode.CONVERSATION_LIST:
+            self.running = False
+        elif self.mode == ViewMode.CONVERSATION_TREE:
             self.running = False
 
 

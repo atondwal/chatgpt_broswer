@@ -25,7 +25,7 @@
 
 1. **JSON Storage**: Human-readable auxiliary file using existing Conversation UUIDs
 2. **Adjacency List + Materialized Paths**: Efficient tree operations with fast queries
-3. **TUI Extension**: Add new ViewMode.TREE_VIEW to existing architecture
+3. **TUI Extension**: Add new ViewMode.CONVERSATION_TREE to existing architecture
 4. **Atomic Operations**: Backup/recovery for data safety
 
 ## Technical Design
@@ -54,14 +54,22 @@ class MetadataStore:
 ### Data Models
 
 ```python
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, Optional, Set
+
+class NodeType(Enum):
+    FOLDER = "folder"
+    CONVERSATION = "conversation"
+
 @dataclass
 class TreeNode:
     id: str                    # UUID for folders, conversation_id for conversations
     name: str                  # Display name
     node_type: NodeType        # FOLDER or CONVERSATION
-    parent_id: Optional[str]   # Parent node ID
-    children: Set[str]         # Child node IDs
-    path: str                  # Materialized path: "/Work/Python/"
+    parent_id: Optional[str] = None   # Parent node ID
+    children: Set[str] = field(default_factory=set)  # Child node IDs
+    path: str = ""             # Materialized path: "/Work/Python/"
     expanded: bool = True      # UI state
 
 @dataclass
@@ -74,15 +82,16 @@ class ConversationMetadata:
 
 @dataclass
 class OrganizationData:
-    tree_nodes: Dict[str, TreeNode]
-    conversation_metadata: Dict[str, ConversationMetadata]
-    root_nodes: Set[str]       # Top-level folder IDs
+    tree_nodes: Dict[str, TreeNode] = field(default_factory=dict)
+    conversation_metadata: Dict[str, ConversationMetadata] = field(default_factory=dict)
+    root_nodes: Set[str] = field(default_factory=set)  # Top-level folder IDs
+    version: str = "1.0"       # Schema version for migration
 ```
 
 ### Integration Points
 
 - **CLI**: Add `organize` command to `ChatGPTBrowserCLI`
-- **TUI**: Add `TREE_VIEW` mode and `TreeListView` component
+- **TUI**: Add `CONVERSATION_TREE` mode and `TreeListView` component
 - **Storage**: `conversations_organization.json` alongside existing file
 - **Data**: Reference existing `Conversation.id` UUIDs
 - **Compatibility**: Zero impact on existing functionality
@@ -103,7 +112,7 @@ class OrganizationData:
 - Migration tool for existing conversations
 
 ### Phase 3: TUI Tree View
-- Extend `chatgpt_tui.py` with `TREE_VIEW` mode
+- Extend `chatgpt_tui.py` with `CONVERSATION_TREE` mode
 - `TreeListView` component with Unicode rendering (`├─`, `└─`)
 - Keyboard navigation: expand/collapse, move between folders
 - Integrate with existing search and detail views
@@ -131,21 +140,6 @@ class OrganizationData:
 - Tree rendering: < 50ms
 - File saves: < 50ms with atomic guarantees
 
-## Observability
-
-### Logging
-- Tree operations: create/move/delete with node IDs
-- File I/O operations: save/load with timing metrics
-- Error conditions: corruption detection, recovery attempts
-- Performance: operation timing for large datasets
-- Structured JSON logging format for analysis
-
-### Metrics
-- Tree depth and breadth statistics
-- Most frequently accessed folders/conversations
-- Search query patterns and performance
-- File size growth over time
-- User interaction patterns in TUI
 
 ## Future Enhancements
 
@@ -161,9 +155,6 @@ class OrganizationData:
 - JSON format limits scale (could migrate to SQLite for huge datasets)
 - No undo/redo for organization changes
 - No real-time collaboration
-
-## Dependencies
-
 
 ## Security & Dependencies
 
