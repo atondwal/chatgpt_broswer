@@ -277,7 +277,57 @@ def main(stdscr):
         stdscr.refresh()
         stdscr.getch()
 
-def export_conversation(history, idx=0):
+def get_message_content(msg):
+    """Extract content from a message in various formats"""
+    content = msg.get('content', '')
+    
+    # Handle content that might be a list (for newer ChatGPT formats)
+    if isinstance(content, list):
+        content_parts = []
+        for part in content:
+            if isinstance(part, dict):
+                if 'text' in part:
+                    content_parts.append(part['text'])
+                # Handle other types like images
+                elif 'type' in part and part['type'] == 'image_url':
+                    content_parts.append(f"[IMAGE: {part.get('image_url', {}).get('url', 'Unknown image')}]")
+            elif isinstance(part, str):
+                content_parts.append(part)
+        content = ' '.join(content_parts)
+    
+    return content
+
+def analyze_conversation(convo):
+    """Analyze conversation structure and print debug info"""
+    print("\nDEBUG INFO:")
+    print("-" * 50)
+    
+    print(f"Keys in conversation object: {', '.join(convo.keys())}")
+    
+    if 'messages' in convo:
+        print(f"Number of messages: {len(convo['messages'])}")
+        if convo['messages']:
+            first_msg = convo['messages'][0]
+            print(f"First message keys: {', '.join(first_msg.keys())}")
+            if 'content' in first_msg:
+                content = first_msg['content']
+                print(f"Content type: {type(content)}")
+                if isinstance(content, list):
+                    print(f"Content list length: {len(content)}")
+                    if content:
+                        print(f"First content item type: {type(content[0])}")
+                        if isinstance(content[0], dict):
+                            print(f"First content item keys: {', '.join(content[0].keys())}")
+    else:
+        # Look for alternative message formats
+        for key in convo.keys():
+            if isinstance(convo[key], list) and len(convo[key]) > 0:
+                first_item = convo[key][0]
+                if isinstance(first_item, dict):
+                    print(f"Possible message list in key '{key}': {len(convo[key])} items")
+                    print(f"First item keys: {', '.join(first_item.keys())}")
+
+def export_conversation(history, idx=0, debug=False):
     """Export a single conversation to stdout"""
     if not history or idx >= len(history):
         print("No conversation found at index", idx)
@@ -288,7 +338,29 @@ def export_conversation(history, idx=0):
     print(f"Conversation: {title}")
     print("=" * 50)
     
-    msgs = convo.get('messages', [])
+    # Look for messages in multiple possible formats
+    msgs = []
+    if 'messages' in convo and isinstance(convo['messages'], list):
+        msgs = convo['messages']
+    elif 'mapping' in convo and isinstance(convo['mapping'], dict):
+        # Handle OpenAI's alternate format
+        try:
+            # Find the root node
+            for node_id, node in convo['mapping'].items():
+                if node.get('parent') is None or node.get('parent') == "":
+                    # Start from root and traverse
+                    current_id = node_id
+                    while current_id:
+                        node = convo['mapping'][current_id]
+                        if 'message' in node and node['message']:
+                            msgs.append(node['message'])
+                        current_id = node.get('children', [None])[0]
+        except Exception as e:
+            print(f"Error parsing mapping format: {e}")
+    
+    if debug:
+        analyze_conversation(convo)
+    
     if not msgs:
         print("\nNo messages found in this conversation.")
         return
@@ -296,17 +368,7 @@ def export_conversation(history, idx=0):
     for i, msg in enumerate(msgs):
         try:
             role = msg.get('role', 'unknown')
-            content = msg.get('content', '')
-            
-            # Handle content that might be a list (for newer ChatGPT formats)
-            if isinstance(content, list):
-                content_parts = []
-                for part in content:
-                    if isinstance(part, dict) and 'text' in part:
-                        content_parts.append(part['text'])
-                    elif isinstance(part, str):
-                        content_parts.append(part)
-                content = ' '.join(content_parts)
+            content = get_message_content(msg)
             
             print(f"\n{role.upper()}:")
             print("-" * 50)
