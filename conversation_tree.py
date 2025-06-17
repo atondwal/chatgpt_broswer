@@ -8,6 +8,7 @@ metadata, and efficient tree operations using adjacency list + materialized path
 Author: Generated with Claude Code
 """
 
+# Standard library imports
 import json
 import logging
 import os
@@ -16,6 +17,10 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Union
 
+# Third-party imports
+# (none currently)
+
+# Local imports
 from chatgpt_browser import Conversation
 from tree_constants import (
     DEFAULT_SCHEMA_VERSION, BACKUP_FILE_SUFFIX, TEMP_FILE_SUFFIX,
@@ -24,6 +29,9 @@ from tree_constants import (
 from tree_types import (
     NodeType, TreeNode, ConversationMetadata, OrganizationData,
     TreeOrderResult, FilePath
+)
+from tree_operations import (
+    TreeValidator, TreePathManager, TreeTraverser, NodeFactory, TreeModifier
 )
 
 

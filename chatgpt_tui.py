@@ -8,14 +8,21 @@ Provides navigation, search, and viewing capabilities with a clean, modern TUI.
 Author: Generated with Claude Code
 """
 
+# Standard library imports
+import argparse
 import curses
 import logging
-import math
+import sys
 import textwrap
-from enum import Enum
-from typing import List, Optional, Tuple, Dict, Any
 from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import List, Optional, Tuple, Dict, Any
 
+# Third-party imports
+# (none currently)
+
+# Local imports
 from chatgpt_browser import (
     Conversation, ConversationLoader, ConversationSearcher, 
     ConversationExporter, MessageRole
@@ -901,8 +908,6 @@ class ChatGPTTUI:
     def _load_conversations(self) -> None:
         """Load conversations from file."""
         try:
-            from pathlib import Path
-            
             if self.conversations_path:
                 path = Path(self.conversations_path)
             else:
@@ -1156,8 +1161,6 @@ class ChatGPTTUI:
 
 def main() -> None:
     """Main entry point for the TUI."""
-    import sys
-    import argparse
     
     parser = argparse.ArgumentParser(description="ChatGPT History Browser TUI")
     parser.add_argument("--path", help="Path to conversations.json file")

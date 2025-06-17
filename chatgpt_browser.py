@@ -14,8 +14,9 @@ Usage:
 Author: Generated with Claude Code
 """
 
+# Standard library imports
 import argparse
-import curses
+import datetime
 import json
 import logging
 import os
@@ -24,6 +25,12 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+# Third-party imports
+# (none currently)
+
+# Local imports
+# (added as needed)
 
 # Configure logging
 logging.basicConfig(
@@ -870,7 +877,6 @@ class ChatGPTBrowserCLI:
             print(f"Title: {sample_conv.title}")
             print(f"Messages: {sample_conv.message_count}")
             if sample_conv.create_time:
-                import datetime
                 create_date = datetime.datetime.fromtimestamp(sample_conv.create_time)
                 print(f"Created: {create_date}")
 

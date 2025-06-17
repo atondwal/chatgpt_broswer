@@ -57,6 +57,54 @@ ERROR_MESSAGES = {
     "INVALID_NODE_TYPE": "Invalid node type: {node_type}",
 }
 
+# UI Constants
+UI_CONSTANTS = {
+    "HEADER_HEIGHT": 1,
+    "STATUS_BAR_HEIGHT": 1,
+    "BORDER_HEIGHT": 2,
+    "MIN_TERMINAL_WIDTH": 80,
+    "MIN_TERMINAL_HEIGHT": 24,
+    "DEFAULT_PAGE_SIZE": 10,
+    "SCROLL_MARGIN": 3,
+    "MAX_TITLE_LENGTH": 60,
+    "INDENT_SIZE": 2,
+}
+
+# Color pair definitions
+COLOR_PAIRS = {
+    "DEFAULT": 1,
+    "HEADER": 2,
+    "SELECTED": 3,
+    "BORDER": 4,
+    "STATUS": 5,
+    "USER_MESSAGE": 6,
+    "ASSISTANT_MESSAGE": 7,
+    "SYSTEM_MESSAGE": 8,
+    "SEARCH_HIGHLIGHT": 9,
+    "ERROR": 10,
+    "FOLDER": 11,
+    "CONVERSATION_TREE": 12,
+}
+
+# Keyboard shortcuts
+SHORTCUTS = {
+    "QUIT": ["q", "ESC"],
+    "HELP": ["?", "F1"],
+    "SEARCH": ["/", "s"],
+    "BACK": ["BACKSPACE", "b"],
+    "ENTER": ["ENTER", "RETURN"],
+    "UP": ["UP", "k"],
+    "DOWN": ["DOWN", "j"],
+    "PAGE_UP": ["PAGE_UP"],
+    "PAGE_DOWN": ["PAGE_DOWN"],
+    "HOME": ["HOME"],
+    "END": ["END"],
+    "REFRESH": ["r", "F5"],
+    "EXPORT": ["e"],
+    "TREE_VIEW": ["t"],
+    "LIST_VIEW": ["l"],
+}
+
 # Logging configuration
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_LEVEL_DEFAULT = "INFO"
