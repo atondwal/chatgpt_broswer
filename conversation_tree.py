@@ -150,7 +150,7 @@ class TreeManager:
         
         # Prevent moving node to itself or its descendants (cycle detection)
         if new_parent_id == node_id:
-            raise ValueError("Cannot move node to itself")
+            raise ValueError("Move would create a cycle")
             
         if new_parent_id and self._would_create_cycle(node_id, new_parent_id):
             raise ValueError("Move would create a cycle")
