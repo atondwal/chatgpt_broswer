@@ -327,6 +327,29 @@ def analyze_conversation(convo):
                     print(f"Possible message list in key '{key}': {len(convo[key])} items")
                     print(f"First item keys: {', '.join(first_item.keys())}")
 
+def build_message_tree(mapping, current_id, visited=None):
+    """Recursively build a tree of messages from the mapping structure"""
+    if visited is None:
+        visited = set()
+    
+    if not current_id or current_id in visited:
+        return []
+    
+    visited.add(current_id)
+    node = mapping.get(current_id, {})
+    message = node.get('message', None)
+    
+    messages = []
+    if message:
+        messages.append(message)
+    
+    # Process all children
+    for child_id in node.get('children', []):
+        if child_id:
+            messages.extend(build_message_tree(mapping, child_id, visited))
+    
+    return messages
+
 def export_conversation(history, idx=0, debug=False):
     """Export a single conversation to stdout"""
     if not history or idx >= len(history):
@@ -338,6 +361,9 @@ def export_conversation(history, idx=0, debug=False):
     print(f"Conversation: {title}")
     print("=" * 50)
     
+    if debug:
+        analyze_conversation(convo)
+    
     # Look for messages in multiple possible formats
     msgs = []
     if 'messages' in convo and isinstance(convo['messages'], list):
@@ -345,21 +371,40 @@ def export_conversation(history, idx=0, debug=False):
     elif 'mapping' in convo and isinstance(convo['mapping'], dict):
         # Handle OpenAI's alternate format
         try:
-            # Find the root node
-            for node_id, node in convo['mapping'].items():
-                if node.get('parent') is None or node.get('parent') == "":
-                    # Start from root and traverse
-                    current_id = node_id
-                    while current_id:
-                        node = convo['mapping'][current_id]
-                        if 'message' in node and node['message']:
-                            msgs.append(node['message'])
-                        current_id = node.get('children', [None])[0]
+            mapping = convo['mapping']
+            current_node_id = convo.get('current_node')
+            
+            # If we know the current node, start from there and find the root
+            if current_node_id:
+                # Traverse up to find the root
+                root_id = current_node_id
+                while mapping.get(root_id, {}).get('parent'):
+                    root_id = mapping.get(root_id, {}).get('parent')
+                
+                # Now build the message tree from the root
+                msgs = build_message_tree(mapping, root_id)
+            else:
+                # Find the root node directly
+                for node_id, node in mapping.items():
+                    if node.get('parent') is None or node.get('parent') == "":
+                        msgs = build_message_tree(mapping, node_id)
+                        break
+            
+            # Sort by create time if available and valid
+            if msgs:
+                try:
+                    # Try to sort if possible
+                    has_create_time = any(msg.get('create_time') for msg in msgs)
+                    if has_create_time:
+                        msgs.sort(key=lambda x: x.get('create_time', 0) or 0)
+                except Exception as e:
+                    if debug:
+                        print(f"Couldn't sort messages: {e}")
         except Exception as e:
             print(f"Error parsing mapping format: {e}")
-    
-    if debug:
-        analyze_conversation(convo)
+            if debug:
+                import traceback
+                traceback.print_exc()
     
     if not msgs:
         print("\nNo messages found in this conversation.")
@@ -401,7 +446,20 @@ if __name__ == '__main__':
             # Export a specific conversation
             try:
                 idx = int(sys.argv[2]) - 1  # Convert to 0-based index
-                export_conversation(history, idx)
+                debug = "--debug" in sys.argv
+                export_conversation(history, idx, debug)
+            except ValueError:
+                print("Error: Please provide a valid conversation number")
+        elif sys.argv[1] == "debug" and len(sys.argv) > 2:
+            # Debug a specific conversation structure
+            try:
+                idx = int(sys.argv[2]) - 1  # Convert to 0-based index
+                if idx < 0 or idx >= len(history):
+                    print(f"Error: Conversation number {idx+1} out of range (1-{len(history)})")
+                else:
+                    convo = history[idx]
+                    print(f"Conversation: {convo.get('title', 'Untitled')}")
+                    analyze_conversation(convo)
             except ValueError:
                 print("Error: Please provide a valid conversation number")
         elif sys.argv[1] == "search" and len(sys.argv) > 2:
@@ -412,13 +470,37 @@ if __name__ == '__main__':
                 print(f"Found {len(results)} conversations matching '{term}':")
                 for i, convo in enumerate(results[:20]):
                     print(f"{i+1}. {convo.get('title', f'Conversation {convo.get('id', i)}')}")
+                
+                # If --export flag is present, export the first result
+                if "--export" in sys.argv and results:
+                    print("\nExporting first matching conversation:")
+                    export_conversation([results[0]], 0, "--debug" in sys.argv)
             else:
                 print(f"No conversations found matching '{term}'")
+        elif sys.argv[1] == "info":
+            # Show info about the conversation database
+            print(f"Conversation database: {HISTORY_PATH}")
+            print(f"Total conversations: {len(history)}")
+            
+            # Count messages
+            total_msgs = 0
+            for convo in history:
+                if 'messages' in convo and isinstance(convo['messages'], list):
+                    total_msgs += len(convo['messages'])
+            
+            print(f"Total messages: {total_msgs}")
+            
+            # Show sample structure of the first conversation
+            if history:
+                print("\nSample conversation structure:")
+                analyze_conversation(history[0])
         else:
             print("Usage:")
-            print("  python cgpt.py list [count]       - List conversations")
-            print("  python cgpt.py export <number>    - Export conversation by number")
-            print("  python cgpt.py search <term>      - Search for conversations")
+            print("  python cgpt.py list [count]          - List conversations")
+            print("  python cgpt.py export <number> [--debug] - Export conversation by number")
+            print("  python cgpt.py debug <number>        - Show conversation structure details")
+            print("  python cgpt.py search <term> [--export] [--debug] - Search for conversations")
+            print("  python cgpt.py info                  - Show information about the database")
     else:
         # Try interactive mode if no arguments provided
         try:
