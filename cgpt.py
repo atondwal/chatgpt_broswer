@@ -104,18 +104,85 @@ def load_history(path):
         return []
 
 def simple_mode(path):
-    """Alternative non-curses mode that just prints the conversations"""
+    """Alternative non-curses mode that allows viewing conversations"""
     history = load_history(path)
     if not history:
         print("No conversations found.")
         return
     
-    print(f"Found {len(history)} conversations")
-    for i, convo in enumerate(history[:10]):  # Show first 10 conversations
-        title = convo.get('title', f"Conversation {convo.get('id', i)}")
-        print(f"{i+1}. {title}")
+    while True:
+        # Clear screen
+        print("\033[H\033[J", end="")
+        
+        print(f"Found {len(history)} conversations")
+        print("=" * 50)
+        for i, convo in enumerate(history[:20]):  # Show first 20 conversations
+            title = convo.get('title', f"Conversation {convo.get('id', i)}")
+            print(f"{i+1}. {title}")
+        
+        print("\nOptions:")
+        print("  Enter a number to view a conversation")
+        print("  n - Next page")
+        print("  p - Previous page")
+        print("  s - Search conversations")
+        print("  q - Quit")
+        
+        choice = input("\nEnter your choice: ").strip().lower()
+        
+        if choice == 'q':
+            break
+        elif choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(history):
+                view_conversation(history[idx])
+            else:
+                print("Invalid conversation number")
+                input("Press Enter to continue...")
+        elif choice == 's':
+            term = input("Enter search term: ").strip().lower()
+            results = [c for c in history if term in c.get('title', '').lower()]
+            if results:
+                print(f"\nFound {len(results)} matching conversations:")
+                for i, convo in enumerate(results[:20]):
+                    print(f"{i+1}. {convo.get('title', f'Conversation {convo.get('id', i)}')}")
+                
+                sub_choice = input("\nEnter number to view (or Enter to return): ")
+                if sub_choice.isdigit() and 0 < int(sub_choice) <= len(results):
+                    view_conversation(results[int(sub_choice) - 1])
+            else:
+                print("No matching conversations found")
+                input("Press Enter to continue...")
+
+def view_conversation(convo):
+    """Display a conversation in simple text mode"""
+    # Clear screen
+    print("\033[H\033[J", end="")
     
-    print("\nUse the curses interface to browse all conversations.")
+    title = convo.get('title', 'Untitled Conversation')
+    print(f"Conversation: {title}")
+    print("=" * 50)
+    
+    msgs = convo.get('messages', [])
+    for msg in msgs:
+        role = msg.get('role', 'unknown')
+        content = msg.get('content', '')
+        
+        # Handle content that might be a list (for newer ChatGPT formats)
+        if isinstance(content, list):
+            content_parts = []
+            for part in content:
+                if isinstance(part, dict) and 'text' in part:
+                    content_parts.append(part['text'])
+                elif isinstance(part, str):
+                    content_parts.append(part)
+            content = ' '.join(content_parts)
+        
+        print(f"\n{role.upper()}:")
+        print("-" * 50)
+        print(content)
+    
+    print("\n" + "=" * 50)
+    input("Press Enter to return to the conversation list...")
 
 def main(stdscr):
     try:
