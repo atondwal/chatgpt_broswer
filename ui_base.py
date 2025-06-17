@@ -63,8 +63,16 @@ class BaseView(ABC):
     def __init__(self, stdscr, start_y: int = 0, height: int = 0):
         self.stdscr = stdscr
         self.start_y = start_y
-        self.height = height or (curses.LINES - start_y - UI_CONSTANTS['STATUS_BAR_HEIGHT'])
-        self.width = curses.COLS
+        
+        # Handle curses attributes safely for testing
+        try:
+            self.height = height or (curses.LINES - start_y - UI_CONSTANTS['STATUS_BAR_HEIGHT'])
+            self.width = curses.COLS
+        except (AttributeError, TypeError):
+            # Fallback for testing environments
+            self.height = height or 24
+            self.width = 80
+            
         self.scroll_state = ScrollState()
     
     @abstractmethod

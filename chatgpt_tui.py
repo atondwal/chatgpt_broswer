@@ -30,7 +30,10 @@ from chatgpt_browser import (
 from conversation_tree import (
     ConversationOrganizer, TreeNode, NodeType, ConversationMetadata
 )
-from tree_constants import TREE_CHARS
+from tree_constants import TREE_CHARS, UI_CONSTANTS, COLOR_PAIRS, SHORTCUTS
+from ui_base import (
+    BaseView, NavigableListView, ScrollState, InputHandler, UIFormatter
+)
 
 
 class ViewMode(Enum):
@@ -44,18 +47,18 @@ class ViewMode(Enum):
 
 class ColorPair(Enum):
     """Color pairs for the TUI."""
-    DEFAULT = 1
-    HEADER = 2
-    SELECTED = 3
-    BORDER = 4
-    STATUS = 5
-    USER_MESSAGE = 6
-    ASSISTANT_MESSAGE = 7
-    SYSTEM_MESSAGE = 8
-    SEARCH_HIGHLIGHT = 9
-    ERROR = 10
-    FOLDER = 11
-    CONVERSATION_TREE = 12
+    DEFAULT = COLOR_PAIRS["DEFAULT"]
+    HEADER = COLOR_PAIRS["HEADER"]
+    SELECTED = COLOR_PAIRS["SELECTED"]
+    BORDER = COLOR_PAIRS["BORDER"]
+    STATUS = COLOR_PAIRS["STATUS"]
+    USER_MESSAGE = COLOR_PAIRS["USER_MESSAGE"]
+    ASSISTANT_MESSAGE = COLOR_PAIRS["ASSISTANT_MESSAGE"]
+    SYSTEM_MESSAGE = COLOR_PAIRS["SYSTEM_MESSAGE"]
+    SEARCH_HIGHLIGHT = COLOR_PAIRS["SEARCH_HIGHLIGHT"]
+    ERROR = COLOR_PAIRS["ERROR"]
+    FOLDER = COLOR_PAIRS["FOLDER"]
+    CONVERSATION_TREE = COLOR_PAIRS["CONVERSATION_TREE"]
 
 
 @dataclass
