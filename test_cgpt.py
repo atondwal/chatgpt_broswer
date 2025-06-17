@@ -14,9 +14,12 @@ from unittest.mock import patch, mock_open, MagicMock
 from typing import Dict, List, Any, Tuple
 
 # Import the functions we want to test
-# We'll need to refactor imports after restructuring
+# Using the new refactored module with backward compatibility
 sys.path.insert(0, '/home/atondwal/playground')
-import cgpt
+try:
+    import chatgpt_browser as cgpt
+except ImportError:
+    import cgpt
 
 
 class TestMessageExtraction(unittest.TestCase):
@@ -222,8 +225,10 @@ class TestContentExtraction(unittest.TestCase):
         }
         
         content = cgpt.get_message_content(message)
-        # Current behavior: doesn't extract thoughts properly yet
-        self.assertEqual(content, "[Empty or unsupported message format]")
+        # Refactored behavior: now properly extracts thoughts!
+        self.assertIn("THOUGHTS", content)
+        self.assertIn("Test summary", content)
+        self.assertIn("Test thought content", content)
 
     def test_extract_reasoning_recap_content(self):
         """Test extracting reasoning recap content."""
@@ -235,8 +240,9 @@ class TestContentExtraction(unittest.TestCase):
         }
         
         content = cgpt.get_message_content(message)
-        # Current behavior: doesn't extract reasoning recap properly
-        self.assertEqual(content, "[Empty or unsupported message format]")
+        # Refactored behavior: now properly extracts reasoning recap!
+        self.assertIn("REASONING", content)
+        self.assertIn("Thought for 5 seconds", content)
 
     def test_extract_json_code_content(self):
         """Test extracting JSON code from parts.""" 
@@ -261,8 +267,9 @@ class TestContentExtraction(unittest.TestCase):
         }
         
         content = cgpt.get_message_content(message)
-        # Current behavior: doesn't extract user profile properly
-        self.assertEqual(content, "[Empty or unsupported message format]")
+        # Refactored behavior: now properly extracts user profile!
+        self.assertIn("USER PROFILE", content)
+        self.assertIn("Python developer", content)
 
     def test_extract_empty_content(self):
         """Test handling of empty or malformed content."""
@@ -583,26 +590,27 @@ class TestRoleExtraction(unittest.TestCase):
 class TestCLIFunctionality(unittest.TestCase):
     """Test CLI argument parsing and command execution."""
     
-    @patch('cgpt.load_history')
-    @patch('cgpt.list_conversations')
-    def test_list_command(self, mock_list, mock_load):
+    @patch('sys.stdout')
+    def test_list_command(self, mock_stdout):
         """Test the list command."""
-        mock_load.return_value = [{"title": "Test"}]
+        conversations = [{"title": "Test Conversation"}]
         
-        # This would test CLI parsing once we extract it
-        # For now, test the list_conversations function directly
-        cgpt.list_conversations([{"title": "Test Conversation"}], 5)
-        mock_list.assert_called_once()
+        # Test the list_conversations function directly
+        cgpt.list_conversations(conversations, 5)
+        
+        # Verify output was printed
+        self.assertTrue(mock_stdout.write.called)
 
-    @patch('cgpt.load_history')
-    @patch('cgpt.export_conversation')
-    def test_export_command(self, mock_export, mock_load):
+    @patch('sys.stdout')
+    def test_export_command(self, mock_stdout):
         """Test the export command."""
-        mock_load.return_value = [{"title": "Test"}]
+        conversations = [{"title": "Test", "id": "test-1", "messages": []}]
         
         # Test export_conversation function directly  
-        cgpt.export_conversation([{"title": "Test"}], 0)
-        mock_export.assert_called_once()
+        cgpt.export_conversation(conversations, 0)
+        
+        # Verify output was printed
+        self.assertTrue(mock_stdout.write.called)
 
     def test_invalid_conversation_number(self):
         """Test handling of invalid conversation numbers."""
