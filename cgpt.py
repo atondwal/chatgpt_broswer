@@ -454,9 +454,29 @@ def export_conversation(history, idx=0, debug=False):
     
     for i, msg in enumerate(msgs):
         try:
-            role = msg.get('role', 'unknown')
+            # Extract role, trying different known formats
+            role = "unknown"
+            
+            # Standard format
+            if msg.get('role'):
+                role = msg.get('role')
+            # Content type as role
+            elif msg.get('content_type'):
+                role = msg.get('content_type')
+            # Author field
+            elif msg.get('author'):
+                if isinstance(msg['author'], dict) and 'role' in msg['author']:
+                    role = msg['author']['role']
+                else:
+                    role = str(msg['author'])
+            
+            # Get content
             content = get_message_content(msg)
             
+            if not content or content == "[Empty or unsupported message format]":
+                # Skip empty messages
+                continue
+                
             print(f"\n{role.upper()}:")
             print("-" * 50)
             print(content)
