@@ -110,15 +110,24 @@ def simple_mode(path):
         print("No conversations found.")
         return
     
+    page_size = 20
+    current_page = 0
+    total_pages = (len(history) + page_size - 1) // page_size
+    
     while True:
         # Clear screen
         print("\033[H\033[J", end="")
         
-        print(f"Found {len(history)} conversations")
+        start_idx = current_page * page_size
+        end_idx = min(start_idx + page_size, len(history))
+        
+        print(f"Found {len(history)} conversations - Page {current_page + 1}/{total_pages}")
         print("=" * 50)
-        for i, convo in enumerate(history[:20]):  # Show first 20 conversations
+        
+        for i, convo in enumerate(history[start_idx:end_idx]):
+            display_idx = start_idx + i + 1
             title = convo.get('title', f"Conversation {convo.get('id', i)}")
-            print(f"{i+1}. {title}")
+            print(f"{display_idx}. {title}")
         
         print("\nOptions:")
         print("  Enter a number to view a conversation")
@@ -131,6 +140,10 @@ def simple_mode(path):
         
         if choice == 'q':
             break
+        elif choice == 'n' and current_page < total_pages - 1:
+            current_page += 1
+        elif choice == 'p' and current_page > 0:
+            current_page -= 1
         elif choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(history):
@@ -139,19 +152,58 @@ def simple_mode(path):
                 print("Invalid conversation number")
                 input("Press Enter to continue...")
         elif choice == 's':
-            term = input("Enter search term: ").strip().lower()
-            results = [c for c in history if term in c.get('title', '').lower()]
-            if results:
-                print(f"\nFound {len(results)} matching conversations:")
-                for i, convo in enumerate(results[:20]):
-                    print(f"{i+1}. {convo.get('title', f'Conversation {convo.get('id', i)}')}")
+            search_term = input("Enter search term: ").strip().lower()
+            if not search_term:
+                continue
                 
-                sub_choice = input("\nEnter number to view (or Enter to return): ")
-                if sub_choice.isdigit() and 0 < int(sub_choice) <= len(results):
-                    view_conversation(results[int(sub_choice) - 1])
-            else:
+            results = [c for c in history if search_term in c.get('title', '').lower()]
+            
+            if not results:
                 print("No matching conversations found")
                 input("Press Enter to continue...")
+                continue
+                
+            # Sub-menu for search results
+            search_page = 0
+            search_pages = (len(results) + page_size - 1) // page_size
+            
+            while True:
+                # Clear screen
+                print("\033[H\033[J", end="")
+                
+                s_start = search_page * page_size
+                s_end = min(s_start + page_size, len(results))
+                
+                print(f"Found {len(results)} matching conversations - Page {search_page + 1}/{search_pages}")
+                print(f"Search term: '{search_term}'")
+                print("=" * 50)
+                
+                for i, convo in enumerate(results[s_start:s_end]):
+                    display_idx = i + 1
+                    title = convo.get('title', f"Conversation {convo.get('id', i)}")
+                    print(f"{display_idx}. {title}")
+                
+                print("\nOptions:")
+                print("  Enter a number to view a conversation")
+                print("  n - Next page")
+                print("  p - Previous page")
+                print("  b - Back to main menu")
+                
+                sub_choice = input("\nEnter your choice: ").strip().lower()
+                
+                if sub_choice == 'b':
+                    break
+                elif sub_choice == 'n' and search_page < search_pages - 1:
+                    search_page += 1
+                elif sub_choice == 'p' and search_page > 0:
+                    search_page -= 1
+                elif sub_choice.isdigit():
+                    idx = int(sub_choice) - 1 + s_start
+                    if 0 <= idx < len(results):
+                        view_conversation(results[idx])
+                    else:
+                        print("Invalid conversation number")
+                        input("Press Enter to continue...")
 
 def view_conversation(convo):
     """Display a conversation in simple text mode"""
