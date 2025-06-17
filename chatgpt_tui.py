@@ -23,6 +23,7 @@ from chatgpt_browser import (
 from conversation_tree import (
     ConversationOrganizer, TreeNode, NodeType, ConversationMetadata
 )
+from tree_constants import TREE_CHARS
 
 
 class ViewMode(Enum):
@@ -255,7 +256,7 @@ class ConversationListView:
         
         for i in range(visible_lines):
             y = self.dims.start_y + 1 + i
-            char = "█" if i == scroll_position else "░"
+            char = TREE_CHARS["SCROLL_BAR_FILLED"] if i == scroll_position else TREE_CHARS["SCROLL_BAR_EMPTY"]
             try:
                 self.stdscr.addstr(y, x, char)
             except curses.error:
@@ -427,7 +428,7 @@ class ConversationDetailView:
         
         for i in range(visible_lines):
             y = self.dims.start_y + 1 + i
-            char = "█" if i == scroll_position else "░"
+            char = TREE_CHARS["SCROLL_BAR_FILLED"] if i == scroll_position else TREE_CHARS["SCROLL_BAR_EMPTY"]
             try:
                 self.stdscr.addstr(y, x, char)
             except curses.error:
@@ -712,12 +713,12 @@ class TreeListView:
                 node, conversation, depth = self.tree_items[list_index]
                 
                 # Create tree visualization
-                indent = "  " * depth
+                indent = TREE_CHARS["TREE_INDENT"] * depth
                 
                 if node.node_type == NodeType.FOLDER:
                     # Folder with expand/collapse indicator
-                    expand_char = "▼" if node.expanded else "▶"
-                    folder_icon = "📁"
+                    expand_char = TREE_CHARS["FOLDER_EXPANDED"] if node.expanded else TREE_CHARS["FOLDER_COLLAPSED"]
+                    folder_icon = TREE_CHARS["FOLDER_ICON"]
                     prefix = f"{indent}{expand_char} {folder_icon} "
                     name = node.name
                     
@@ -729,7 +730,7 @@ class TreeListView:
                     color = ColorPair.FOLDER.value
                 else:
                     # Conversation
-                    conv_icon = "💬"
+                    conv_icon = TREE_CHARS["CONVERSATION_ICON"]
                     prefix = f"{indent}  {conv_icon} "
                     
                     # Use custom title or conversation title
@@ -744,7 +745,7 @@ class TreeListView:
 
                 # Selection indicator
                 if list_index == self.current_index:
-                    prefix = "▶ " + prefix[2:]
+                    prefix = TREE_CHARS["SELECTION_INDICATOR"] + " " + prefix[2:]
                 else:
                     prefix = "  " + prefix[2:]
 
@@ -791,7 +792,7 @@ class TreeListView:
         
         for i in range(visible_lines):
             y = self.dims.start_y + 1 + i
-            char = "█" if i == scroll_position else "░"
+            char = TREE_CHARS["SCROLL_BAR_FILLED"] if i == scroll_position else TREE_CHARS["SCROLL_BAR_EMPTY"]
             try:
                 self.stdscr.addstr(y, x, char)
             except curses.error:

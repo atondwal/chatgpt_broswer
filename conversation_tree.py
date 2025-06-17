@@ -13,49 +13,18 @@ import logging
 import os
 import shutil
 import uuid
-from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 from chatgpt_browser import Conversation
-
-
-class NodeType(Enum):
-    """Type of tree node."""
-    FOLDER = "folder"
-    CONVERSATION = "conversation"
-
-
-@dataclass
-class TreeNode:
-    """Represents a node in the conversation tree."""
-    id: str                    # UUID for folders, conversation_id for conversations
-    name: str                  # Display name
-    node_type: NodeType        # FOLDER or CONVERSATION
-    parent_id: Optional[str] = None   # Parent node ID
-    children: Set[str] = field(default_factory=set)  # Child node IDs
-    path: str = ""             # Materialized path: "/Work/Python/"
-    expanded: bool = True      # UI state
-
-
-@dataclass
-class ConversationMetadata:
-    """Metadata for a conversation."""
-    conversation_id: str       # Links to Conversation.id
-    custom_title: Optional[str] = None
-    tags: Set[str] = field(default_factory=set)
-    notes: str = ""
-    favorite: bool = False
-
-
-@dataclass
-class OrganizationData:
-    """Complete organization data structure."""
-    tree_nodes: Dict[str, TreeNode] = field(default_factory=dict)
-    conversation_metadata: Dict[str, ConversationMetadata] = field(default_factory=dict)
-    root_nodes: Set[str] = field(default_factory=set)  # Top-level folder IDs
-    version: str = "1.0"       # Schema version for migration
+from tree_constants import (
+    DEFAULT_SCHEMA_VERSION, BACKUP_FILE_SUFFIX, TEMP_FILE_SUFFIX,
+    ERROR_MESSAGES, MAX_TREE_DEPTH, MAX_CHILDREN_PER_FOLDER
+)
+from tree_types import (
+    NodeType, TreeNode, ConversationMetadata, OrganizationData,
+    TreeOrderResult, FilePath
+)
 
 
 class TreeManager:
@@ -81,17 +50,17 @@ class TreeManager:
             ValueError: If parent doesn't exist or would create cycle
         """
         if not name.strip():
-            raise ValueError("Folder name cannot be empty")
+            raise ValueError(ERROR_MESSAGES["EMPTY_FOLDER_NAME"])
             
         # Validate parent exists if specified
         if parent_id and parent_id not in self.organization_data.tree_nodes:
-            raise ValueError(f"Parent folder {parent_id} does not exist")
+            raise ValueError(ERROR_MESSAGES["PARENT_NOT_FOUND"].format(parent_id=parent_id))
             
         # Validate parent is a folder
         if parent_id:
             parent_node = self.organization_data.tree_nodes[parent_id]
             if parent_node.node_type != NodeType.FOLDER:
-                raise ValueError("Parent must be a folder")
+                raise ValueError(ERROR_MESSAGES["PARENT_NOT_FOLDER"])
         
         # Generate unique ID
         folder_id = str(uuid.uuid4())
@@ -136,7 +105,7 @@ class TreeManager:
             ValueError: If node doesn't exist, would create cycle, or invalid parent
         """
         if node_id not in self.organization_data.tree_nodes:
-            raise ValueError(f"Node {node_id} does not exist")
+            raise ValueError(ERROR_MESSAGES["NODE_NOT_FOUND"].format(node_id=node_id))
             
         # Validate new parent exists if specified
         if new_parent_id and new_parent_id not in self.organization_data.tree_nodes:
@@ -150,10 +119,10 @@ class TreeManager:
         
         # Prevent moving node to itself or its descendants (cycle detection)
         if new_parent_id == node_id:
-            raise ValueError("Move would create a cycle")
+            raise ValueError(ERROR_MESSAGES["CYCLE_DETECTED"])
             
         if new_parent_id and self._would_create_cycle(node_id, new_parent_id):
-            raise ValueError("Move would create a cycle")
+            raise ValueError(ERROR_MESSAGES["CYCLE_DETECTED"])
             
         node = self.organization_data.tree_nodes[node_id]
         old_parent_id = node.parent_id
@@ -189,7 +158,7 @@ class TreeManager:
             ValueError: If node doesn't exist
         """
         if node_id not in self.organization_data.tree_nodes:
-            raise ValueError(f"Node {node_id} does not exist")
+            raise ValueError(ERROR_MESSAGES["NODE_NOT_FOUND"].format(node_id=node_id))
             
         # Collect all descendants first
         descendants = self._get_all_descendants(node_id)
@@ -233,13 +202,13 @@ class TreeManager:
             
         # Validate parent exists if specified
         if parent_id and parent_id not in self.organization_data.tree_nodes:
-            raise ValueError(f"Parent folder {parent_id} does not exist")
+            raise ValueError(ERROR_MESSAGES["PARENT_NOT_FOUND"].format(parent_id=parent_id))
             
         # Validate parent is a folder
         if parent_id:
             parent_node = self.organization_data.tree_nodes[parent_id]
             if parent_node.node_type != NodeType.FOLDER:
-                raise ValueError("Parent must be a folder")
+                raise ValueError(ERROR_MESSAGES["PARENT_NOT_FOLDER"])
         
         # Calculate path
         if parent_id:
