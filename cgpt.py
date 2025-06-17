@@ -277,16 +277,101 @@ def main(stdscr):
         stdscr.refresh()
         stdscr.getch()
 
-if __name__ == '__main__':
-    # Always use simple mode directly for now since curses has issues
-    # This avoids the terminal issues that can happen when curses fails
-    print("Using simple mode for ChatGPT conversation browser\n")
-    simple_mode(HISTORY_PATH)
+def export_conversation(history, idx=0):
+    """Export a single conversation to stdout"""
+    if not history or idx >= len(history):
+        print("No conversation found at index", idx)
+        return
     
-    # Original code with curses (commented out for now):
-    # try:
-    #     curses.wrapper(main)
-    # except Exception as e:
-    #     print(f"Error initializing curses: {e}")
-    #     print("Falling back to simple mode...\n")
-    #     simple_mode(HISTORY_PATH)
+    convo = history[idx]
+    title = convo.get('title', 'Untitled Conversation')
+    print(f"Conversation: {title}")
+    print("=" * 50)
+    
+    msgs = convo.get('messages', [])
+    if not msgs:
+        print("\nNo messages found in this conversation.")
+        return
+    
+    for i, msg in enumerate(msgs):
+        try:
+            role = msg.get('role', 'unknown')
+            content = msg.get('content', '')
+            
+            # Handle content that might be a list (for newer ChatGPT formats)
+            if isinstance(content, list):
+                content_parts = []
+                for part in content:
+                    if isinstance(part, dict) and 'text' in part:
+                        content_parts.append(part['text'])
+                    elif isinstance(part, str):
+                        content_parts.append(part)
+                content = ' '.join(content_parts)
+            
+            print(f"\n{role.upper()}:")
+            print("-" * 50)
+            print(content)
+        except Exception as e:
+            print(f"\nError displaying message {i+1}: {str(e)}")
+
+def list_conversations(history, count=20):
+    """List available conversations"""
+    print(f"Found {len(history)} conversations")
+    print("=" * 50)
+    for i, convo in enumerate(history[:count]):
+        title = convo.get('title', f"Conversation {convo.get('id', i)}")
+        print(f"{i+1}. {title}")
+
+if __name__ == '__main__':
+    import sys
+    
+    history = load_history(HISTORY_PATH)
+    
+    if len(sys.argv) > 1:
+        # Command-line argument mode
+        if sys.argv[1] == "list":
+            # List conversations
+            count = 20
+            if len(sys.argv) > 2 and sys.argv[2].isdigit():
+                count = int(sys.argv[2])
+            list_conversations(history, count)
+        elif sys.argv[1] == "export" and len(sys.argv) > 2:
+            # Export a specific conversation
+            try:
+                idx = int(sys.argv[2]) - 1  # Convert to 0-based index
+                export_conversation(history, idx)
+            except ValueError:
+                print("Error: Please provide a valid conversation number")
+        elif sys.argv[1] == "search" and len(sys.argv) > 2:
+            # Search for conversations
+            term = sys.argv[2].lower()
+            results = [c for c in history if term in c.get('title', '').lower()]
+            if results:
+                print(f"Found {len(results)} conversations matching '{term}':")
+                for i, convo in enumerate(results[:20]):
+                    print(f"{i+1}. {convo.get('title', f'Conversation {convo.get('id', i)}')}")
+            else:
+                print(f"No conversations found matching '{term}'")
+        else:
+            print("Usage:")
+            print("  python cgpt.py list [count]       - List conversations")
+            print("  python cgpt.py export <number>    - Export conversation by number")
+            print("  python cgpt.py search <term>      - Search for conversations")
+    else:
+        # Try interactive mode if no arguments provided
+        try:
+            # First try curses interface
+            curses.wrapper(main)
+        except Exception as e:
+            # Fall back to simple mode
+            print(f"Error initializing curses: {e}")
+            print("Falling back to simple mode...\n")
+            try:
+                simple_mode(HISTORY_PATH)
+            except Exception as e:
+                # If simple mode fails, show usage
+                print(f"Error in simple mode: {e}")
+                print("\nUsage:")
+                print("  python cgpt.py list [count]       - List conversations")
+                print("  python cgpt.py export <number>    - Export conversation by number")
+                print("  python cgpt.py search <term>      - Search for conversations")
