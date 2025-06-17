@@ -207,34 +207,55 @@ def simple_mode(path):
 
 def view_conversation(convo):
     """Display a conversation in simple text mode"""
-    # Clear screen
-    print("\033[H\033[J", end="")
-    
-    title = convo.get('title', 'Untitled Conversation')
-    print(f"Conversation: {title}")
-    print("=" * 50)
-    
-    msgs = convo.get('messages', [])
-    for msg in msgs:
-        role = msg.get('role', 'unknown')
-        content = msg.get('content', '')
+    try:
+        # Clear screen
+        print("\033[H\033[J", end="")
         
-        # Handle content that might be a list (for newer ChatGPT formats)
-        if isinstance(content, list):
-            content_parts = []
-            for part in content:
-                if isinstance(part, dict) and 'text' in part:
-                    content_parts.append(part['text'])
-                elif isinstance(part, str):
-                    content_parts.append(part)
-            content = ' '.join(content_parts)
+        title = convo.get('title', 'Untitled Conversation')
+        print(f"Conversation: {title}")
+        print("=" * 50)
         
-        print(f"\n{role.upper()}:")
-        print("-" * 50)
-        print(content)
-    
-    print("\n" + "=" * 50)
-    input("Press Enter to return to the conversation list...")
+        msgs = convo.get('messages', [])
+        if not msgs:
+            print("\nNo messages found in this conversation.")
+        
+        for i, msg in enumerate(msgs):
+            try:
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                
+                # Handle content that might be a list (for newer ChatGPT formats)
+                if isinstance(content, list):
+                    content_parts = []
+                    for part in content:
+                        if isinstance(part, dict) and 'text' in part:
+                            content_parts.append(part['text'])
+                        elif isinstance(part, str):
+                            content_parts.append(part)
+                    content = ' '.join(content_parts)
+                
+                print(f"\n{role.upper()}:")
+                print("-" * 50)
+                print(content)
+                
+                # If there are many messages, offer pagination
+                if i > 0 and i % 5 == 0 and i < len(msgs) - 1:
+                    response = input("\nPress Enter to continue, 'q' to return to list: ")
+                    if response.lower() == 'q':
+                        break
+                    # Clear screen for next set of messages
+                    print("\033[H\033[J", end="")
+                    print(f"Conversation: {title} (continued)")
+                    print("=" * 50)
+            except Exception as e:
+                print(f"\nError displaying message {i+1}: {str(e)}")
+                continue
+        
+        print("\n" + "=" * 50)
+        input("Press Enter to return to the conversation list...")
+    except Exception as e:
+        print(f"\nError viewing conversation: {str(e)}")
+        input("Press Enter to return to the conversation list...")
 
 def main(stdscr):
     try:
