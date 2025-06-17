@@ -906,6 +906,24 @@ class ChatGPTBrowserCLI:
             print(f"  Content length: {len(first_msg.content)}")
             print(f"  Content preview: {first_msg.content[:100]}...")
 
+    def cmd_tui(self) -> None:
+        """Launch the Terminal User Interface."""
+        try:
+            # Import here to avoid circular imports and make TUI optional
+            from chatgpt_tui import ChatGPTTUI
+            
+            tui = ChatGPTTUI(
+                conversations_path=str(self.conversations_path),
+                debug=self.debug
+            )
+            tui.run()
+        except ImportError:
+            print("Error: TUI module not available. Make sure chatgpt_tui.py is in the same directory.")
+        except Exception as e:
+            if self.debug:
+                raise
+            print(f"Error launching TUI: {e}")
+
     def run(self, args: List[str]) -> int:
         """
         Run the CLI with the given arguments.
@@ -944,6 +962,8 @@ class ChatGPTBrowserCLI:
                 self.cmd_info()
             elif parsed_args.command == 'debug':
                 self.cmd_debug(parsed_args.number)
+            elif parsed_args.command == 'tui':
+                self.cmd_tui()
             else:
                 parser.print_help()
                 return 1
@@ -968,6 +988,7 @@ class ChatGPTBrowserCLI:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
+  %(prog)s tui                               # Launch interactive Terminal User Interface
   %(prog)s list 10                           # List first 10 conversations
   %(prog)s export 5 --debug                  # Export conversation #5 with debug info
   %(prog)s search "python" --content         # Search for "python" in content
@@ -1041,6 +1062,9 @@ Examples:
             type=int,
             help='Conversation number to debug'
         )
+        
+        # TUI command
+        subparsers.add_parser('tui', help='Launch interactive Terminal User Interface')
         
         return parser
 
