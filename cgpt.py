@@ -279,23 +279,65 @@ def main(stdscr):
 
 def get_message_content(msg):
     """Extract content from a message in various formats"""
-    content = msg.get('content', '')
+    # ChatGPT web client format
+    if isinstance(msg, dict):
+        # Check for the normal content field
+        content = msg.get('content', '')
+        
+        # Handle content that might be a list (for newer ChatGPT formats)
+        if isinstance(content, list):
+            content_parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    if 'text' in part:
+                        content_parts.append(part['text'])
+                    # Handle other types like images
+                    elif 'type' in part and part['type'] == 'image_url':
+                        content_parts.append(f"[IMAGE: {part.get('image_url', {}).get('url', 'Unknown image')}]")
+                elif isinstance(part, str):
+                    content_parts.append(part)
+            content = ' '.join(content_parts)
+            if content:
+                return content
+        
+        # Check for older web app format with 'parts'
+        if isinstance(content, str) and content:
+            return content
+            
+        # Check for parts format
+        if 'parts' in msg and isinstance(msg['parts'], list):
+            return ' '.join([str(part) for part in msg['parts'] if part])
+            
+        # Try content_type field format
+        if 'content_type' in msg:
+            content_type = msg.get('content_type', '')
+            
+            # Text content
+            if content_type == 'text' and 'parts' in msg:
+                return ' '.join([str(part) for part in msg['parts'] if part])
+                
+            # User instructions or context
+            elif content_type in ['user_editable_context', 'user_instructions']:
+                if 'user_profile' in msg:
+                    return f"[USER PROFILE]\n{msg['user_profile']}"
+                elif 'user_instructions' in msg:
+                    return f"[USER INSTRUCTIONS]\n{msg['user_instructions']}"
+                
+            # Code or other specialized content
+            elif 'parts' in msg:
+                try:
+                    # Try to parse as JSON if it looks like it
+                    if msg['parts'] and isinstance(msg['parts'][0], str) and msg['parts'][0].startswith('{') and msg['parts'][0].endswith('}'):
+                        data = json.loads(msg['parts'][0])
+                        if 'content' in data:
+                            return data['content']
+                    
+                    return ' '.join([str(part) for part in msg['parts'] if part])
+                except:
+                    return ' '.join([str(part) for part in msg['parts'] if part])
     
-    # Handle content that might be a list (for newer ChatGPT formats)
-    if isinstance(content, list):
-        content_parts = []
-        for part in content:
-            if isinstance(part, dict):
-                if 'text' in part:
-                    content_parts.append(part['text'])
-                # Handle other types like images
-                elif 'type' in part and part['type'] == 'image_url':
-                    content_parts.append(f"[IMAGE: {part.get('image_url', {}).get('url', 'Unknown image')}]")
-            elif isinstance(part, str):
-                content_parts.append(part)
-        content = ' '.join(content_parts)
-    
-    return content
+    # Return empty string if nothing found
+    return "[Empty or unsupported message format]"
 
 def analyze_conversation(convo):
     """Analyze conversation structure and print debug info"""
