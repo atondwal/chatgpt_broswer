@@ -16,6 +16,7 @@ def get_input(stdscr, prompt: str, initial: str = "") -> Optional[str]:
     x = (width - win_width) // 2
     
     win = curses.newwin(win_height, win_width, y, x)
+    win.keypad(True)  # Enable special keys
     win.border()
     
     # Show prompt
@@ -69,6 +70,7 @@ def confirm(stdscr, message: str) -> bool:
     x = (width - win_width) // 2
     
     win = curses.newwin(win_height, win_width, y, x)
+    win.keypad(True)  # Enable special keys
     win.border()
     
     # Show message
@@ -101,6 +103,7 @@ def select_folder(stdscr, tree_items: list) -> Optional[str]:
     x = (width - win_width) // 2
     
     win = curses.newwin(win_height, win_width, y, x)
+    win.keypad(True)  # Enable special keys
     
     # Add root option
     options = [(None, 0)] + folders  # None = root
