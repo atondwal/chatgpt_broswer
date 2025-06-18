@@ -600,8 +600,6 @@ class ConversationOrganizer:
             List of (TreeNode, Conversation) tuples in tree order
             TreeNode is the tree node, Conversation is None for folder nodes
         """
-        # Import needed here to avoid circular import issues
-        from tree_types import NodeType as TreeNodeType
         
         # Create lookup for conversations by ID
         conv_lookup = {conv.id: conv for conv in conversations}
@@ -614,7 +612,7 @@ class ConversationOrganizer:
         
         # Add organized conversations from tree
         for node in tree_nodes:
-            if node.node_type == TreeNodeType.FOLDER:
+            if node.node_type == NodeType.FOLDER:
                 result.append((node, None))
             else:
                 # Find matching conversation
@@ -634,7 +632,7 @@ class ConversationOrganizer:
                 temp_node = TreeNode(
                     id=conv.id,
                     name=conv.title,
-                    node_type=TreeNodeType.CONVERSATION,
+                    node_type=NodeType.CONVERSATION,
                     parent_id=None,
                     path="/",
                     expanded=False

@@ -8,6 +8,7 @@ Provides interactive folder operations like create, rename, delete.
 import curses
 from typing import Optional, Tuple
 from tree_constants import UI_CONSTANTS, COLOR_PAIRS
+from tree_types import NodeType
 
 
 class FolderManager:
@@ -188,7 +189,6 @@ class FolderManager:
         win.border()
         
         # Filter to only show folders
-        from tree_types import NodeType
         folders = [(i, item) for i, item in enumerate(tree_items) 
                   if item[0].node_type == NodeType.FOLDER]
         folders.insert(0, (-1, (None, None, 0)))  # Add "Root" option
