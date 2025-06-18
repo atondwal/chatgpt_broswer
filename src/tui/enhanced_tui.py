@@ -330,7 +330,8 @@ class ChatGPTTUI:
                 if node.node_type == NodeType.FOLDER:
                     parent_id = node.id
                     
-            self.organizer.create_folder(name, parent_id)
+            folder_id = self.organizer.create_folder(name, parent_id)
+            self.organizer.save_organization()
             self._refresh_tree()
             self.status_message = f"Created '{name}'"
         except Exception as e:
