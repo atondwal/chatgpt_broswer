@@ -12,7 +12,7 @@ from src.core.simple_loader import load_conversations
 from src.tree.simple_tree import ConversationTree
 from src.tui.simple_detail import DetailView
 from src.tui.simple_input import get_input, confirm, select_folder
-from src.tui.enhanced_tree_ux import EnhancedTreeView
+from src.tui.simple_tree_view import SimpleTreeView
 from src.tui.simple_search_overlay import SearchOverlay
 
 
@@ -23,7 +23,7 @@ class ViewMode(Enum):
     SEARCH = "search"
 
 
-class ChatGPTTUI:
+class SimpleTUI:
     """Terminal interface for browsing ChatGPT conversations."""
     
     def __init__(self, conversations_file: str, debug: bool = False):
@@ -71,7 +71,7 @@ class ChatGPTTUI:
         # Initialize components
         height, width = stdscr.getmaxyx()
         self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
-        self.tree_view = EnhancedTreeView(stdscr, 1, 0, width, height - 2)
+        self.tree_view = SimpleTreeView(stdscr, 1, 0, width, height - 2)
         self.search_overlay = SearchOverlay(stdscr, 0, 0, width)
         
         # Initialize tree
@@ -569,7 +569,7 @@ def main():
         sys.exit(1)
     
     try:
-        tui = ChatGPTTUI(args.conversations_file, debug=args.debug)
+        tui = SimpleTUI(args.conversations_file, debug=args.debug)
         curses.wrapper(tui.run)
     except Exception as e:
         print(f"Error: {e}")

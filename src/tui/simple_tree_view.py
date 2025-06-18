@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enhanced tree view with excellent UX."""
+"""Simple tree view with excellent UX."""
 
 import curses
 from datetime import datetime
@@ -7,8 +7,8 @@ from typing import List, Tuple, Optional
 from src.tree.simple_tree import TreeNode
 
 
-class EnhancedTreeView:
-    """Tree view with improved visual hierarchy and interactions."""
+class SimpleTreeView:
+    """Tree view with excellent visual hierarchy and interactions."""
     
     def __init__(self, stdscr, y: int, x: int, width: int, height: int):
         self.stdscr = stdscr
