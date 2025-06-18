@@ -386,6 +386,14 @@ class TestTUIEnhancements:
         self.tui.tree_view.get_selected = Mock(return_value=None)
         self.tui.search_overlay = Mock()
         self.tui.tree_items = []
+        
+        # Initialize managers that are normally created in run()
+        from src.tui.tree_manager import TreeManager
+        from src.tui.operations_manager import OperationsManager
+        self.tui.tree_manager = TreeManager(self.tui.tree, self.tui)
+        # Create a mock stdscr for operations_manager
+        self.tui.stdscr = Mock()
+        self.tui.operations_manager = OperationsManager(self.tui.tree, self.tui.stdscr)
     
     def test_copy_item(self):
         """Test copying item title."""
@@ -393,37 +401,51 @@ class TestTUIEnhancements:
         mock_item = (TreeNode("1", "Test", is_folder=False), Mock(title="Test Conversation"), 0)
         self.tui.tree_view.get_selected = Mock(return_value=mock_item)
         
-        self.tui._copy_item()
+        # Use action handler directly
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('y'), "copy")
+        result = self.tui.action_manager.handle("copy", context)
         
+        assert result is not None
         assert hasattr(self.tui, 'clipboard')
         assert self.tui.clipboard['type'] == 'title'
         assert self.tui.clipboard['data'] == 'Test Conversation'
-        assert "Copied:" in self.tui.status_message
+        assert "Copied:" in result.message
     
     def test_paste_item(self):
         """Test pasting item."""
         # No clipboard
-        self.tui._paste_item()
-        assert "Nothing to paste" in self.tui.status_message
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('p'), "paste")
+        result = self.tui.action_manager.handle("paste", context)
+        assert result is not None
+        assert "Nothing to paste" in result.message
         
         # With clipboard
         self.tui.clipboard = {"type": "title", "data": "Test"}
-        self.tui._paste_item()
-        assert "Paste:" in self.tui.status_message
+        result = self.tui.action_manager.handle("paste", context)
+        assert result is not None
+        assert "Paste:" in result.message
     
     def test_refresh_conversations(self):
         """Test refreshing conversations from file."""
-        self.tui._refresh_conversations()
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, 116, "refresh")  # F5 key
+        result = self.tui.tree_manager.handle("refresh", context)
         
         # Should reload from file
-        assert "Refreshed" in self.tui.status_message
+        assert result is not None
+        assert "Refreshed" in result.message
     
     def test_filter_folders(self):
         """Test showing only folders."""
-        self.tui._filter_folders()
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('1'), "filter_folders")
+        result = self.tui.tree_manager.handle("filter_folders", context)
         
+        assert result is not None
         assert len(self.tui.filtered_conversations) == 0
-        assert "Showing only folders" in self.tui.status_message
+        assert "Showing only folders" in result.message
     
     def test_show_all(self):
         """Test showing all items."""
@@ -431,10 +453,13 @@ class TestTUIEnhancements:
         self.tui.filtered_conversations = []
         
         # Then show all
-        self.tui._show_all()
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('A'), "show_all")
+        result = self.tui.tree_manager.handle("show_all", context)
         
+        assert result is not None
         assert len(self.tui.filtered_conversations) == len(self.tui.conversations)
-        assert "Showing all items" in self.tui.status_message
+        assert "Showing all items" in result.message
     
     def test_expand_to_depth(self):
         """Test expanding tree to specific depth."""
@@ -443,25 +468,35 @@ class TestTUIEnhancements:
         folder2_id = self.tui.tree.create_folder("Folder 2", parent_id=folder1_id)
         
         # Test collapse all (depth 0)
-        self.tui._expand_to_depth(0)
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('0'), "expand_depth_0")
+        result = self.tui.tree_manager.handle("expand_depth_0", context)
+        assert result is not None
         for node in self.tui.tree.nodes.values():
             if node.is_folder:
                 assert not node.expanded
-        assert "Collapsed all folders" in self.tui.status_message
+        assert "Collapsed all folders" in result.message
         
         # Test expand to depth 2
-        self.tui._expand_to_depth(2)
-        assert "Expanded to depth 2" in self.tui.status_message
+        context = ActionContext(self.tui, ord('2'), "expand_depth_2")
+        result = self.tui.tree_manager.handle("expand_depth_2", context)
+        assert result is not None
+        assert "Expanded to depth 2" in result.message
     
     def test_implemented_actions(self):
         """Test actually implemented action messages."""
         # Test undo with empty stack
-        self.tui._undo_action()
-        assert "Nothing to undo" in self.tui.status_message
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('u'), "undo")
+        result = self.tui.action_manager.handle("undo", context)
+        assert result is not None
+        assert "Nothing to undo" in result.message
         
         # Test repeat with no last action
-        self.tui._repeat_last_action()
-        assert "No action to repeat" in self.tui.status_message
+        context = ActionContext(self.tui, ord('.'), "repeat")
+        result = self.tui.action_manager.handle("repeat", context)
+        assert result is not None
+        assert "No action to repeat" in result.message
         
         # Test visual mode toggle
         self.tui.status_message = self.tui.selection_manager.toggle_visual_mode(
@@ -478,28 +513,38 @@ class TestTUIEnhancements:
     def test_indent_outdent_items(self):
         """Test indent/outdent operations."""
         # No items selected
-        self.tui._indent_items()
-        assert "No items selected to indent" in self.tui.status_message
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, 9, "indent")  # Tab key
+        result = self.tui.operations_manager.handle("indent", context)
+        assert result is not None
+        assert "No items selected to indent" in result.message
         
-        self.tui._outdent_items()
-        assert "No items selected to outdent" in self.tui.status_message
+        context = ActionContext(self.tui, 353, "outdent")  # Shift+Tab
+        result = self.tui.operations_manager.handle("outdent", context)
+        assert result is not None
+        assert "No items selected to outdent" in result.message
         
         # With items selected but no current item (should fail gracefully)
         self.tui.selected_items = {"1", "2"}
         self.tui.tree_view.get_selected = Mock(return_value=None)
-        self.tui._indent_items()
-        assert "Cannot determine target" in self.tui.status_message
+        context = ActionContext(self.tui, 9, "indent")
+        result = self.tui.operations_manager.handle("indent", context)
+        assert result is not None
+        assert "Cannot determine target" in result.message
         
         # Test with mocked current item
         mock_item = (TreeNode("1", "Test", is_folder=False), Mock(title="Test"), 0)
         self.tui.tree_view.get_selected = Mock(return_value=mock_item)
-        self.tui._indent_items()
-        assert "No folder available" in self.tui.status_message
+        context = ActionContext(self.tui, 9, "indent")
+        result = self.tui.operations_manager.handle("indent", context)
+        assert result is not None
+        assert "No folder available" in result.message
     
     def test_quick_filter(self):
         """Test quick filter activation."""
         from src.tui.tui import ViewMode
         
+        # _quick_filter is still called directly in TUI
         self.tui._quick_filter()
         
         assert self.tui.current_view == ViewMode.SEARCH
@@ -520,17 +565,21 @@ class TestTUIEnhancements:
         
         # Test indent with undo
         original_parent = self.tui.tree.nodes[conv_id].parent_id
-        self.tui._indent_items()
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, 9, "indent")
+        result = self.tui.operations_manager.handle("indent", context)
         
         # Should have saved undo state
-        assert len(self.tui.undo_stack) > 0
-        action, data = self.tui.undo_stack[-1]
+        assert len(self.tui.action_manager.undo_stack) > 0
+        action, data = self.tui.action_manager.undo_stack[-1]
         assert action == "indent"
         assert (conv_id, original_parent) in data
         
         # Undo the indent
-        self.tui._undo_action()
-        assert "Undid indent operation" in self.tui.status_message
+        context = ActionContext(self.tui, ord('u'), "undo")
+        result = self.tui.action_manager.handle("undo", context)
+        assert result is not None
+        assert "Undid indent operation" in result.message
         assert self.tui.tree.nodes[conv_id].parent_id == original_parent
         
         # Test outdent with undo
@@ -539,17 +588,20 @@ class TestTUIEnhancements:
         self.tui.selected_items = {conv_id}
         
         # Outdent
-        self.tui._outdent_items()
+        context = ActionContext(self.tui, 353, "outdent")
+        result = self.tui.operations_manager.handle("outdent", context)
         
         # Should have saved undo state
-        assert len(self.tui.undo_stack) > 0
-        action, data = self.tui.undo_stack[-1]
+        assert len(self.tui.action_manager.undo_stack) > 0
+        action, data = self.tui.action_manager.undo_stack[-1]
         assert action == "outdent"
         assert (conv_id, folder_id) in data
         
         # Undo the outdent
-        self.tui._undo_action()
-        assert "Undid outdent operation" in self.tui.status_message
+        context = ActionContext(self.tui, ord('u'), "undo")
+        result = self.tui.action_manager.handle("undo", context)
+        assert result is not None
+        assert "Undid outdent operation" in result.message
         assert self.tui.tree.nodes[conv_id].parent_id == folder_id
     
     def test_undo_multiple_items(self):
@@ -571,16 +623,19 @@ class TestTUIEnhancements:
         orig_parent2 = self.tui.tree.nodes[conv_id2].parent_id
         
         # Perform indent
-        self.tui._indent_items()
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, 9, "indent")
+        result = self.tui.operations_manager.handle("indent", context)
         
         # Verify undo data includes both items
-        action, data = self.tui.undo_stack[-1]
+        action, data = self.tui.action_manager.undo_stack[-1]
         assert action == "indent"
         assert (conv_id1, orig_parent1) in data
         assert (conv_id2, orig_parent2) in data
         
         # Undo and verify both items restored
-        self.tui._undo_action()
+        context = ActionContext(self.tui, ord('u'), "undo")
+        result = self.tui.action_manager.handle("undo", context)
         assert self.tui.tree.nodes[conv_id1].parent_id == orig_parent1
         assert self.tui.tree.nodes[conv_id2].parent_id == orig_parent2
     
@@ -913,11 +968,16 @@ class TestTUIEnhancements:
         
         # Mock the input for folder name and stdscr
         from unittest.mock import patch, Mock
-        self.tui.stdscr = Mock()  # Mock the stdscr attribute
         self.tui.stdscr.getmaxyx.return_value = (24, 80)  # Mock terminal size
-        with patch('src.tui.input.get_input', return_value="Test Folder"):
+        with patch('src.tui.operations_manager.get_input', return_value="Test Folder"):
             # Create folder - should move selected items into it
-            self.tui._create_folder()
+            from src.tui.action_handler import ActionContext
+            context = ActionContext(self.tui, ord('n'), "new_folder")
+            result = self.tui.operations_manager.handle("new_folder", context)
+            
+            # Process the result like TUI would
+            if result and result.clear_selection:
+                self.tui.selection_manager.clear_selection()
         
         # Check that folder was created
         folder_nodes = [node for node in self.tui.tree.nodes.values() if node.is_folder and node.name == "Test Folder"]
@@ -935,7 +995,8 @@ class TestTUIEnhancements:
         assert len(self.tui.selected_items) == 0
         
         # Check status message
-        assert "moved 2 items into it" in self.tui.status_message
+        assert result is not None
+        assert "moved 2 items into it" in result.message
     
     def test_create_folder_without_selection(self):
         """Test that creating a folder without selection works normally."""
@@ -943,18 +1004,20 @@ class TestTUIEnhancements:
         
         # Mock the input for folder name and stdscr
         from unittest.mock import patch, Mock
-        self.tui.stdscr = Mock()  # Mock the stdscr attribute
         self.tui.stdscr.getmaxyx.return_value = (24, 80)  # Mock terminal size
-        with patch('src.tui.input.get_input', return_value="Empty Folder"):
+        with patch('src.tui.operations_manager.get_input', return_value="Empty Folder"):
             # Create folder without selection
-            self.tui._create_folder()
+            from src.tui.action_handler import ActionContext
+            context = ActionContext(self.tui, ord('n'), "new_folder")
+            result = self.tui.operations_manager.handle("new_folder", context)
         
         # Check that folder was created
         folder_nodes = [node for node in self.tui.tree.nodes.values() if node.is_folder and node.name == "Empty Folder"]
         assert len(folder_nodes) == 1
         
         # Check normal status message
-        assert self.tui.status_message == "Created 'Empty Folder'"
+        assert result is not None
+        assert result.message == "Created 'Empty Folder'"
     
     def teardown_method(self):
         """Clean up test files."""

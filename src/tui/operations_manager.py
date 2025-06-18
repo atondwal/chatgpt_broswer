@@ -2,25 +2,26 @@
 """Operations management for folder and item operations."""
 
 from typing import Set, List, Tuple, Any, Optional
-from src.tui.input import get_input
+from src.tui.input import get_input, confirm, select_folder
+from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
 
 
-class OperationsManager:
+class OperationsManager(ActionHandler):
     """Manages folder and item operations like create, move, delete, rename."""
     
     def __init__(self, tree, stdscr):
         self.tree = tree
         self.stdscr = stdscr
         
-    def create_folder(self, selected_items: Set[str], current_item: Optional[Tuple[Any, Any, int]] = None) -> Tuple[str, Set[str]]:
+    def create_folder(self, selected_items: Set[str], current_item: Optional[Tuple[Any, Any, int]] = None) -> Tuple[str, bool, Optional[str]]:
         """Create new folder and optionally move selected items into it.
         
         Returns:
-            Tuple of (status_message, cleared_selection)
+            Tuple of (status_message, should_clear_selection, folder_id)
         """
         name = get_input(self.stdscr, "Folder name:")
         if not name:
-            return "Folder creation cancelled", selected_items
+            return "Folder creation cancelled", False, None
             
         try:
             parent_id = None
@@ -47,12 +48,12 @@ class OperationsManager:
                     status = f"Created '{name}' (no items could be moved)"
                     
                 # Clear selection after moving
-                return status, set()
+                return status, True, folder_id
             else:
-                return f"Created '{name}'", selected_items
+                return f"Created '{name}'", False, folder_id
                 
         except Exception as e:
-            return f"Error: {e}", selected_items
+            return f"Error: {e}", False, None
             
     def rename_item(self, current_item: Optional[Tuple[Any, Any, int]]) -> str:
         """Rename the selected item.
@@ -244,3 +245,139 @@ class OperationsManager:
                 moved += 1
                 
         return f"Moved {moved} items down" if moved > 0 else "Could not move items down"
+        
+    # ActionHandler implementation
+    def can_handle(self, action: str) -> bool:
+        """Check if this handler can process the action."""
+        actions = {"new_folder", "rename", "delete", "move_up", "move_down", 
+                   "indent", "outdent", "move", "bulk_move"}
+        return action in actions
+        
+    def handle(self, action: str, context: ActionContext) -> Optional[ActionResult]:
+        """Handle folder and item operations."""
+        if action == "new_folder":
+            message, should_clear_selection, folder_id = self.create_folder(
+                context.selected_items.copy(), 
+                context.selected_item
+            )
+            if "Created" in message and folder_id:
+                # Save action for undo
+                if hasattr(context.tui, 'action_manager'):
+                    context.tui.action_manager.save_undo_state("create", folder_id)
+                return ActionResult(True, message=message, save_tree=True, 
+                                  refresh_tree=True, clear_selection=should_clear_selection)
+            return ActionResult(False, message=message)
+            
+        elif action == "rename":
+            message = self.rename_item(context.selected_item)
+            if "Renamed" in message:
+                return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+            return ActionResult(False, message=message)
+            
+        elif action == "delete":
+            if not context.selected_item:
+                return ActionResult(False, message="No item selected to delete")
+            node, _, _ = context.selected_item
+            item_type = "folder" if node.is_folder else "conversation"
+            
+            if not confirm(context.stdscr, f"Delete {item_type} '{node.name}'?"):
+                return ActionResult(False, message="Delete cancelled")
+                
+            message = self.delete_item(context.selected_item)
+            if "Deleted" in message:
+                return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+            return ActionResult(False, message=message)
+            
+        elif action == "move":
+            if context.selected_items:
+                # Bulk move
+                return self._handle_bulk_move(context)
+            else:
+                # Single item move
+                message = self.move_item(context.selected_item)
+                if "Moved" in message:
+                    return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+                return ActionResult(False, message=message)
+                
+        elif action == "move_up":
+            if context.selected_items:
+                message = self.bulk_move_up(context.selected_items, context.tree_items)
+            else:
+                if not context.selected_item:
+                    return ActionResult(False, message="No item to move")
+                node, _, _ = context.selected_item
+                if self.tree.move_item_up(node.id):
+                    context.tui.action_manager.save_last_action("move_up")
+                    message = f"Moved '{node.name}' up"
+                else:
+                    return ActionResult(False, message="Cannot move up")
+                    
+            if "Moved" in message:
+                return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+            return ActionResult(False, message=message)
+            
+        elif action == "move_down":
+            if context.selected_items:
+                message = self.bulk_move_down(context.selected_items, context.tree_items)
+            else:
+                if not context.selected_item:
+                    return ActionResult(False, message="No item to move")
+                node, _, _ = context.selected_item
+                if self.tree.move_item_down(node.id):
+                    context.tui.action_manager.save_last_action("move_down")
+                    message = f"Moved '{node.name}' down"
+                else:
+                    return ActionResult(False, message="Cannot move down")
+                    
+            if "Moved" in message:
+                return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+            return ActionResult(False, message=message)
+            
+        elif action == "indent":
+            message, original_positions = self.indent_items(
+                context.selected_items, 
+                context.selected_item
+            )
+            if original_positions and hasattr(context.tui, 'action_manager'):
+                context.tui.action_manager.save_undo_state("indent", original_positions)
+            if "Indented" in message:
+                return ActionResult(True, message=message, save_tree=True, 
+                                  refresh_tree=True, clear_selection=True)
+            return ActionResult(False, message=message)
+            
+        elif action == "outdent":
+            message, original_positions = self.outdent_items(context.selected_items)
+            if original_positions and hasattr(context.tui, 'action_manager'):
+                context.tui.action_manager.save_undo_state("outdent", original_positions)
+            if "Outdented" in message:
+                return ActionResult(True, message=message, save_tree=True, 
+                                  refresh_tree=True, clear_selection=True)
+            return ActionResult(False, message=message)
+            
+        return None
+        
+    def _handle_bulk_move(self, context: ActionContext) -> ActionResult:
+        """Handle bulk move operation."""
+        dest_id = select_folder(context.stdscr, context.tree_items)
+        
+        if dest_id is None:
+            return ActionResult(False, message="Move cancelled")
+            
+        moved = 0
+        for item_id in context.selected_items:
+            if item_id != dest_id:  # Can't move to itself
+                try:
+                    self.tree.move_node(item_id, dest_id)
+                    moved += 1
+                except Exception:
+                    pass  # Skip items that can't be moved
+                    
+        if moved > 0:
+            dest_name = self.tree.nodes[dest_id].name if dest_id else "root"
+            return ActionResult(True, 
+                              message=f"Moved {moved} items to '{dest_name}'",
+                              save_tree=True, 
+                              refresh_tree=True, 
+                              clear_selection=True)
+        else:
+            return ActionResult(False, message="No items could be moved")

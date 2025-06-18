@@ -2,9 +2,10 @@
 """Selection management for the TUI interface."""
 
 from typing import Set, Optional, List, Tuple, Any
+from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
 
 
-class SelectionManager:
+class SelectionManager(ActionHandler):
     """Manages selection state including visual mode and multi-select."""
     
     def __init__(self):
@@ -98,3 +99,34 @@ class SelectionManager:
     def get_selected_items(self) -> Set[str]:
         """Get the set of selected item IDs."""
         return self.selected_items.copy()
+        
+    # ActionHandler implementation
+    def can_handle(self, action: str) -> bool:
+        """Check if this handler can process the action."""
+        return action in {"visual_mode", "select_all", "toggle_select", "clear_selection"}
+        
+    def handle(self, action: str, context: ActionContext) -> Optional[ActionResult]:
+        """Handle selection-related actions."""
+        if action == "visual_mode":
+            message = self.toggle_visual_mode(
+                context.tree_view.selected, 
+                context.tree_items
+            )
+            return ActionResult(True, message=message)
+            
+        elif action == "select_all":
+            count = self.select_all(context.tree_items)
+            return ActionResult(True, message=f"Selected {count} items")
+            
+        elif action == "toggle_select":
+            if context.selected_item:
+                node, _, _ = context.selected_item
+                _, message = self.toggle_item_selection(node.id, node.name)
+                return ActionResult(True, message=message)
+            return ActionResult(False, message="No item to select")
+            
+        elif action == "clear_selection":
+            self.clear_selection()
+            return ActionResult(True, message="Selection cleared")
+            
+        return None

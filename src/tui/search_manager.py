@@ -2,9 +2,10 @@
 """Search and filter management for the TUI interface."""
 
 from typing import List, Tuple, Any, Optional
+from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
 
 
-class SearchManager:
+class SearchManager(ActionHandler):
     """Manages search functionality including vim-style search and filtering."""
     
     def __init__(self):
@@ -127,3 +128,31 @@ class SearchManager:
     def has_matches(self) -> bool:
         """Check if there are any search matches."""
         return len(self.search_matches) > 0
+        
+    # ActionHandler implementation
+    def can_handle(self, action: str) -> bool:
+        """Check if this handler can process the action."""
+        return action in {"quick_filter", "search_next", "search_previous"}
+        
+    def handle(self, action: str, context: ActionContext) -> Optional[ActionResult]:
+        """Handle search-related actions."""
+        if action == "quick_filter":
+            message = self.start_filter_mode()
+            # The actual search overlay activation is handled in TUI
+            return ActionResult(True, message=message)
+            
+        elif action == "search_next":
+            tree_index, message = self.search_next()
+            if tree_index is not None:
+                context.tree_view.selected = tree_index
+                context.tree_view._ensure_visible()
+            return ActionResult(True, message=message)
+            
+        elif action == "search_previous":
+            tree_index, message = self.search_previous()
+            if tree_index is not None:
+                context.tree_view.selected = tree_index
+                context.tree_view._ensure_visible()
+            return ActionResult(True, message=message)
+            
+        return None
