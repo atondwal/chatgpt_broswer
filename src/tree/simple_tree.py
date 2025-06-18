@@ -272,16 +272,25 @@ class ConversationTree:
         node = self.nodes[item_id]
         parent_key = node.parent_id or "root"
         
-        # Get current order for this parent
+        # Get current order for this parent  
         if parent_key not in self.custom_order:
-            # Initialize custom order from current siblings
+            # Initialize from siblings in deterministic order (folders first, then by name)
             if node.parent_id:
                 if node.parent_id not in self.nodes:
                     return False
-                siblings = list(self.nodes[node.parent_id].children)
+                siblings = self.nodes[node.parent_id].children
             else:
-                siblings = list(self.root_nodes)
-            self.custom_order[parent_key] = siblings
+                siblings = self.root_nodes
+                
+            # Create deterministic order: folders first (by name), then conversations (by name)
+            siblings_list = list(siblings)
+            folder_ids = [id for id in siblings_list if id in self.nodes and self.nodes[id].is_folder]
+            conv_ids = [id for id in siblings_list if id in self.nodes and not self.nodes[id].is_folder]
+            
+            folder_ids.sort(key=lambda id: self.nodes[id].name.lower())
+            conv_ids.sort(key=lambda id: self.nodes[id].name.lower())
+            
+            self.custom_order[parent_key] = folder_ids + conv_ids
             
         order = self.custom_order[parent_key]
         
@@ -308,14 +317,23 @@ class ConversationTree:
         
         # Get current order for this parent
         if parent_key not in self.custom_order:
-            # Initialize custom order from current siblings
+            # Initialize from siblings in deterministic order (folders first, then by name)
             if node.parent_id:
                 if node.parent_id not in self.nodes:
                     return False
-                siblings = list(self.nodes[node.parent_id].children)
+                siblings = self.nodes[node.parent_id].children
             else:
-                siblings = list(self.root_nodes)
-            self.custom_order[parent_key] = siblings
+                siblings = self.root_nodes
+                
+            # Create deterministic order: folders first (by name), then conversations (by name)
+            siblings_list = list(siblings)
+            folder_ids = [id for id in siblings_list if id in self.nodes and self.nodes[id].is_folder]
+            conv_ids = [id for id in siblings_list if id in self.nodes and not self.nodes[id].is_folder]
+            
+            folder_ids.sort(key=lambda id: self.nodes[id].name.lower())
+            conv_ids.sort(key=lambda id: self.nodes[id].name.lower())
+            
+            self.custom_order[parent_key] = folder_ids + conv_ids
             
         order = self.custom_order[parent_key]
         

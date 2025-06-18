@@ -250,6 +250,8 @@ class ChatGPTTUI:
             self._show_tree_help()
         elif key == ord('o'):  # Toggle sort order
             self._toggle_sort_order()
+        elif key == ord('O'):  # Clear custom ordering (Shift+O)
+            self._clear_custom_order()
             
     def _refresh_tree(self) -> None:
         """Refresh tree items."""
@@ -373,6 +375,7 @@ class ChatGPTTUI:
             "  d       - Delete item",
             "  m       - Move item(s) to folder",
             "  o       - Toggle sort (date/name)",
+            "  Shift+O - Clear custom ordering",
             "",
             "Other:",
             "  /       - Search conversations",
@@ -408,8 +411,17 @@ class ChatGPTTUI:
     def _toggle_sort_order(self) -> None:
         """Toggle between date and alphabetical sorting."""
         self.sort_by_date = not self.sort_by_date
+        # Clear custom ordering to avoid conflicts with new sort order
+        self.tree.custom_order.clear()
         self._refresh_tree()
-        self.status_message = f"Sorting by {'date (newest first)' if self.sort_by_date else 'name (A-Z)'}"
+        self.status_message = f"Sorting by {'date (newest first)' if self.sort_by_date else 'name (A-Z)'} - custom order cleared"
+        
+    def _clear_custom_order(self) -> None:
+        """Clear all custom ordering and return to automatic sorting."""
+        self.tree.custom_order.clear()
+        self.tree.save()
+        self._refresh_tree()
+        self.status_message = "Custom ordering cleared - using automatic sort"
         
     def _move_cursor_to_item(self, item_id: str) -> None:
         """Move cursor to the specified item in the tree."""
