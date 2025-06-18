@@ -7,7 +7,7 @@ Provides both curses-based and simple terminal interfaces for browsing conversat
 
 import curses
 from typing import Any, Dict, List
-from cli_data_loader import load_history, get_message_content
+from src.cli.cli_data_loader import load_history, get_message_content
 
 
 class HistoryOrganizer:

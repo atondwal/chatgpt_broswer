@@ -20,5 +20,5 @@ Interactive mode (no arguments):
 """
 
 if __name__ == '__main__':
-    from cli_parser import parse_and_execute
+    from src.cli.cli_parser import parse_and_execute
     parse_and_execute()

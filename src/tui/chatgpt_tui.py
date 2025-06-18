@@ -23,15 +23,15 @@ from typing import List, Optional, Tuple, Dict, Any
 # (none currently)
 
 # Local imports
-from chatgpt_browser import (
+from src.core.chatgpt_browser import (
     Conversation, ConversationLoader, ConversationSearcher, 
     ConversationExporter, MessageRole
 )
-from conversation_tree import (
+from src.tree.conversation_tree import (
     ConversationOrganizer, TreeNode, NodeType, ConversationMetadata
 )
-from tree_constants import TREE_CHARS, UI_CONSTANTS, COLOR_PAIRS, SHORTCUTS
-from ui_base import (
+from src.tree.tree_constants import TREE_CHARS, UI_CONSTANTS, COLOR_PAIRS, SHORTCUTS
+from src.tui.ui_base import (
     BaseView, NavigableListView, ScrollState, InputHandler, UIFormatter
 )
 

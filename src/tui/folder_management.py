@@ -7,8 +7,8 @@ Provides interactive folder operations like create, rename, delete.
 
 import curses
 from typing import Optional, Tuple
-from tree_constants import UI_CONSTANTS, COLOR_PAIRS
-from tree_types import NodeType
+from src.tree.tree_constants import UI_CONSTANTS, COLOR_PAIRS
+from src.tree.tree_types import NodeType
 
 
 class FolderManager:

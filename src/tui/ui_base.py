@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple, Any
 # (none currently)
 
 # Local imports
-from tree_constants import UI_CONSTANTS
+from src.tree.tree_constants import UI_CONSTANTS
 
 
 @dataclass

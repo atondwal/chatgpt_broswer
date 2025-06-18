@@ -7,10 +7,10 @@ Handles command-line argument parsing and routing to appropriate functionality.
 
 import sys
 from typing import Any, Dict, List, Optional
-from cli_config import HISTORY_PATH
-from cli_data_loader import load_history, analyze_conversation
-from cli_export_formats import export_conversation, list_conversations
-from cli_search import search_conversations, display_search_results, get_search_result_by_index
+from src.cli.cli_config import HISTORY_PATH
+from src.cli.cli_data_loader import load_history, analyze_conversation
+from src.cli.cli_export_formats import export_conversation, list_conversations
+from src.cli.cli_search import search_conversations, display_search_results, get_search_result_by_index
 
 
 def show_usage() -> None:
@@ -224,7 +224,7 @@ def launch_interactive_mode(history: List[Dict[str, Any]]) -> None:
     try:
         # First try curses interface
         import curses
-        from cli_ui_interactive import HistoryOrganizer
+        from src.cli.cli_ui_interactive import HistoryOrganizer
         
         def main_curses(stdscr):
             organizer = HistoryOrganizer(stdscr, history)
@@ -236,7 +236,7 @@ def launch_interactive_mode(history: List[Dict[str, Any]]) -> None:
         print(f"Error initializing curses: {e}")
         print("Falling back to simple mode...\n")
         try:
-            from cli_ui_interactive import simple_mode
+            from src.cli.cli_ui_interactive import simple_mode
             simple_mode(HISTORY_PATH)
         except Exception as e:
             # If simple mode fails, show usage

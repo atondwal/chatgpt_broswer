@@ -21,16 +21,16 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 # (none currently)
 
 # Local imports
-from chatgpt_browser import Conversation
-from tree_constants import (
+from src.core.chatgpt_browser import Conversation
+from src.tree.tree_constants import (
     DEFAULT_SCHEMA_VERSION, BACKUP_FILE_SUFFIX, TEMP_FILE_SUFFIX,
     ERROR_MESSAGES, MAX_TREE_DEPTH, MAX_CHILDREN_PER_FOLDER
 )
-from tree_types import (
+from src.tree.tree_types import (
     NodeType, TreeNode, ConversationMetadata, OrganizationData,
     TreeOrderResult, FilePath
 )
-from tree_operations import (
+from src.tree.tree_operations import (
     TreeValidator, TreePathManager, TreeTraverser, NodeFactory, TreeModifier
 )
 

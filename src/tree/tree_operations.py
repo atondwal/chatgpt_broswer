@@ -11,10 +11,10 @@ import uuid
 from typing import Dict, List, Optional, Set, Tuple
 
 # Local imports
-from tree_constants import (
+from src.tree.tree_constants import (
     ERROR_MESSAGES, MAX_TREE_DEPTH, MAX_CHILDREN_PER_FOLDER
 )
-from tree_types import (
+from src.tree.tree_types import (
     NodeType, TreeNode, ConversationMetadata, OrganizationData
 )
 

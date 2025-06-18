@@ -6,7 +6,7 @@ Provides both title-based and content-based conversation searching capabilities.
 """
 
 from typing import Any, Dict, List, Tuple
-from cli_data_loader import get_message_content
+from src.cli.cli_data_loader import get_message_content
 
 
 def search_conversations_by_title(history: List[Dict[str, Any]], term: str) -> List[Tuple[Dict[str, Any], str]]:
@@ -233,7 +233,7 @@ def interactive_search_menu(history: List[Dict[str, Any]]) -> None:
                 idx = int(choice)
                 convo, context = get_search_result_by_index(results, idx)
                 if convo:
-                    from cli_ui_interactive import view_conversation
+                    from src.cli.cli_ui_interactive import view_conversation
                     view_conversation(convo)
                 else:
                     print(f"Invalid choice: {choice}")
