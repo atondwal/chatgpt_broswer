@@ -69,6 +69,16 @@ class TreeManager:
             parent_node = self.organization_data.tree_nodes[parent_id]
             if parent_node.node_type != NodeType.FOLDER:
                 raise ValueError(ERROR_MESSAGES["PARENT_NOT_FOLDER"])
+            
+            # Validate children limit
+            if len(parent_node.children) >= MAX_CHILDREN_PER_FOLDER:
+                raise ValueError(ERROR_MESSAGES["MAX_CHILDREN_EXCEEDED"].format(max_children=MAX_CHILDREN_PER_FOLDER))
+            
+            # Validate tree depth
+            parent_path = parent_node.path
+            depth = parent_path.count('/') - 1  # Count depth from parent path
+            if depth >= MAX_TREE_DEPTH:
+                raise ValueError(ERROR_MESSAGES["MAX_DEPTH_EXCEEDED"].format(max_depth=MAX_TREE_DEPTH))
         
         # Generate unique ID
         folder_id = str(uuid.uuid4())
@@ -217,6 +227,10 @@ class TreeManager:
             parent_node = self.organization_data.tree_nodes[parent_id]
             if parent_node.node_type != NodeType.FOLDER:
                 raise ValueError(ERROR_MESSAGES["PARENT_NOT_FOLDER"])
+            
+            # Validate children limit
+            if len(parent_node.children) >= MAX_CHILDREN_PER_FOLDER:
+                raise ValueError(ERROR_MESSAGES["MAX_CHILDREN_EXCEEDED"].format(max_children=MAX_CHILDREN_PER_FOLDER))
         
         # Calculate path
         if parent_id:
@@ -396,7 +410,7 @@ class MetadataStore:
     
     def __init__(self, file_path: Union[str, Path], debug: bool = False):
         self.file_path = Path(file_path)
-        self.backup_path = self.file_path.with_suffix('.bak')
+        self.backup_path = self.file_path.with_suffix(self.file_path.suffix + '.bak')
         self.debug = debug
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         
@@ -458,6 +472,10 @@ class MetadataStore:
                 
             # Atomic move
             temp_path.replace(self.file_path)
+            
+            # Create backup after successful save (if it doesn't exist yet)
+            if not self.backup_path.exists():
+                shutil.copy2(self.file_path, self.backup_path)
             
             self.logger.info(f"Saved organization data to {self.file_path}")
             
@@ -582,6 +600,9 @@ class ConversationOrganizer:
             List of (TreeNode, Conversation) tuples in tree order
             TreeNode is the tree node, Conversation is None for folder nodes
         """
+        # Import needed here to avoid circular import issues
+        from tree_types import NodeType as TreeNodeType
+        
         # Create lookup for conversations by ID
         conv_lookup = {conv.id: conv for conv in conversations}
         
@@ -589,8 +610,11 @@ class ConversationOrganizer:
         tree_nodes = self.tree_manager.get_tree_order()
         
         result = []
+        organized_conv_ids = set()
+        
+        # Add organized conversations from tree
         for node in tree_nodes:
-            if node.node_type == NodeType.FOLDER:
+            if node.node_type == TreeNodeType.FOLDER:
                 result.append((node, None))
             else:
                 # Find matching conversation
@@ -600,7 +624,22 @@ class ConversationOrganizer:
                     metadata = self.tree_manager.organization_data.conversation_metadata.get(node.id)
                     if metadata and not metadata.custom_title:
                         node.name = conv.title
-                result.append((node, conv))
+                    result.append((node, conv))
+                    organized_conv_ids.add(node.id)
+        
+        # Add unorganized conversations at the end
+        for conv in conversations:
+            if conv.id not in organized_conv_ids:
+                # Create a temporary node for unorganized conversation
+                temp_node = TreeNode(
+                    id=conv.id,
+                    name=conv.title,
+                    node_type=TreeNodeType.CONVERSATION,
+                    parent_id=None,
+                    path="/",
+                    expanded=False
+                )
+                result.append((temp_node, conv))
                 
         return result
         

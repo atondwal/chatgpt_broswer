@@ -115,24 +115,22 @@ class StatusBar:
             pass  # Ignore drawing errors at screen boundaries
 
 
-class ConversationListView:
-    """Manages the conversation list view."""
+class ConversationListView(NavigableListView):
+    """Manages the conversation list view using base UI components."""
     
     def __init__(self, stdscr, dimensions: WindowDimensions):
-        self.stdscr = stdscr
+        super().__init__(stdscr, dimensions.start_y, dimensions.height)
         self.dims = dimensions
         self.conversations: List[Conversation] = []
         self.filtered_conversations: List[Tuple[int, Conversation]] = []
-        self.current_index = 0
-        self.scroll_offset = 0
         self.search_term = ""
         
     def set_conversations(self, conversations: List[Conversation]) -> None:
         """Set the conversations to display."""
         self.conversations = conversations
         self.filtered_conversations = [(i, conv) for i, conv in enumerate(conversations)]
-        self.current_index = 0
-        self.scroll_offset = 0
+        self.items = [conv for _, conv in self.filtered_conversations]
+        self.scroll_state.reset()
 
     def filter_conversations(self, search_term: str) -> None:
         """Filter conversations based on search term."""
@@ -144,133 +142,106 @@ class ConversationListView:
                 (i, conv) for i, conv in enumerate(self.conversations)
                 if self.search_term in conv.title.lower()
             ]
-        self.current_index = 0
-        self.scroll_offset = 0
-
-    def move_up(self) -> None:
-        """Move selection up."""
-        if self.current_index > 0:
-            self.current_index -= 1
-            self._adjust_scroll()
-
-    def move_down(self) -> None:
-        """Move selection down."""
-        if self.current_index < len(self.filtered_conversations) - 1:
-            self.current_index += 1
-            self._adjust_scroll()
-
-    def page_up(self) -> None:
-        """Move up by one page."""
-        page_size = self.dims.height - 2  # Account for header
-        self.current_index = max(0, self.current_index - page_size)
-        self._adjust_scroll()
-
-    def page_down(self) -> None:
-        """Move down by one page."""
-        page_size = self.dims.height - 2
-        max_index = len(self.filtered_conversations) - 1
-        self.current_index = min(max_index, self.current_index + page_size)
-        self._adjust_scroll()
+        self.items = [conv for _, conv in self.filtered_conversations]
+        self.scroll_state.reset()
 
     def get_selected_conversation(self) -> Optional[Conversation]:
         """Get the currently selected conversation."""
-        if 0 <= self.current_index < len(self.filtered_conversations):
-            _, conversation = self.filtered_conversations[self.current_index]
-            return conversation
+        return self.get_selected_item()
+
+    def format_item(self, item: Conversation, index: int, is_selected: bool) -> str:
+        """Format a conversation for display."""
+        return UIFormatter.truncate_text(item.title, self.width - 6)
+
+    def handle_input(self, key: int) -> Optional[str]:
+        """Handle input for conversation list."""
+        # First try navigation
+        nav_result = self.handle_navigation_input(key)
+        if nav_result:
+            return nav_result
+            
+        # Handle list-specific input
+        if InputHandler.is_enter_key(key):
+            return "select_conversation"
+        elif key == ord('/') or key == ord('s'):
+            return "start_search"
+        elif InputHandler.is_quit_key(key):
+            return "quit"
+        elif InputHandler.is_help_key(key):
+            return "show_help"
+            
         return None
 
-    def _adjust_scroll(self) -> None:
-        """Adjust scroll offset to keep selection visible."""
-        visible_lines = self.dims.height - 2  # Account for header and status
+    # Legacy compatibility methods
+    @property 
+    def current_index(self) -> int:
+        """Get current selection index for compatibility."""
+        return self.scroll_state.selected
+    
+    @current_index.setter
+    def current_index(self, value: int) -> None:
+        """Set current selection index for compatibility."""
+        self.scroll_state.selected = value
         
-        if self.current_index < self.scroll_offset:
-            self.scroll_offset = self.current_index
-        elif self.current_index >= self.scroll_offset + visible_lines:
-            self.scroll_offset = self.current_index - visible_lines + 1
+    @property
+    def scroll_offset(self) -> int:
+        """Get scroll offset for compatibility."""
+        return self.scroll_state.offset
+        
+    @scroll_offset.setter
+    def scroll_offset(self, value: int) -> None:
+        """Set scroll offset for compatibility."""
+        self.scroll_state.offset = value
+        
+    def move_up(self) -> None:
+        """Move selection up - compatibility method."""
+        self.scroll_state.move_up()
+        
+    def move_down(self) -> None:
+        """Move selection down - compatibility method."""
+        self.scroll_state.move_down(len(self.items))
+        
+    def page_up(self) -> None:
+        """Move up by one page - compatibility method."""
+        page_size = self.dims.height - UI_CONSTANTS['HEADER_HEIGHT'] - UI_CONSTANTS['BORDER_HEIGHT']
+        self.scroll_state.page_up(page_size)
+        
+    def page_down(self) -> None:
+        """Move down by one page - compatibility method."""
+        page_size = self.dims.height - UI_CONSTANTS['HEADER_HEIGHT'] - UI_CONSTANTS['BORDER_HEIGHT']
+        self.scroll_state.page_down(len(self.items), page_size)
+        
+    def _adjust_scroll(self) -> None:
+        """Adjust scroll - compatibility method."""
+        visible_lines = self.dims.height - UI_CONSTANTS['HEADER_HEIGHT'] - UI_CONSTANTS['BORDER_HEIGHT']
+        self.scroll_state.adjust_offset(visible_lines)
 
     def draw(self) -> None:
-        """Draw the conversation list."""
+        """Draw the conversation list using base class functionality."""
         try:
-            # Clear the area
-            for y in range(self.dims.start_y, self.dims.start_y + self.dims.height):
-                self.stdscr.move(y, self.dims.start_x)
-                self.stdscr.clrtoeol()
-
-            # Draw header
+            # Build header
             header = f"Conversations ({len(self.filtered_conversations)})"
             if self.search_term:
                 header += f" - Filtered by: '{self.search_term}'"
             
-            self.stdscr.attron(curses.color_pair(ColorPair.HEADER.value))
-            self.stdscr.addstr(
-                self.dims.start_y, 
-                self.dims.start_x, 
-                header[:self.dims.width]
-            )
-            self.stdscr.attroff(curses.color_pair(ColorPair.HEADER.value))
-
-            # Draw conversations
-            visible_lines = self.dims.height - 2
-            for i in range(visible_lines):
-                list_index = self.scroll_offset + i
-                if list_index >= len(self.filtered_conversations):
-                    break
-
-                y = self.dims.start_y + 1 + i
-                orig_index, conversation = self.filtered_conversations[list_index]
-                
-                # Format conversation line
-                prefix = "▶ " if list_index == self.current_index else "  "
-                title = conversation.title
-                msg_count = f" ({conversation.message_count})"
-                
-                # Truncate if necessary
-                max_title_width = self.dims.width - len(prefix) - len(msg_count) - 1
-                if len(title) > max_title_width:
-                    title = title[:max_title_width - 3] + "..."
-                
-                line = f"{prefix}{title}{msg_count}"
-                
-                # Apply selection highlighting
-                if list_index == self.current_index:
-                    self.stdscr.attron(curses.color_pair(ColorPair.SELECTED.value))
-                
-                self.stdscr.addstr(y, self.dims.start_x, line[:self.dims.width])
-                
-                if list_index == self.current_index:
-                    self.stdscr.attroff(curses.color_pair(ColorPair.SELECTED.value))
-
-            # Draw scroll indicator if needed
-            if len(self.filtered_conversations) > visible_lines:
-                self._draw_scroll_indicator()
-
+            # Use base class to draw items
+            self.draw_items(header)
+            
         except curses.error:
             pass  # Ignore drawing errors at screen boundaries
-
-    def _draw_scroll_indicator(self) -> None:
-        """Draw a scroll indicator on the right side."""
-        if self.dims.width < 3:
-            return
-            
-        visible_lines = self.dims.height - 2
-        total_lines = len(self.filtered_conversations)
+    
+    def format_item(self, item: Conversation, index: int, is_selected: bool) -> str:
+        """Format a conversation for display."""
+        prefix = TREE_CHARS["SELECTION_INDICATOR"] + " " if is_selected else "  "
+        title = item.title
+        msg_count = f" ({item.message_count})"
         
-        if total_lines <= visible_lines:
-            return
-            
-        # Calculate scroll bar position
-        scroll_ratio = self.scroll_offset / (total_lines - visible_lines)
-        scroll_position = int(scroll_ratio * (visible_lines - 1))
+        # Calculate available width
+        max_title_width = self.width - len(prefix) - len(msg_count) - 4
+        if len(title) > max_title_width:
+            title = UIFormatter.truncate_text(title, max_title_width)
         
-        x = self.dims.start_x + self.dims.width - 1
-        
-        for i in range(visible_lines):
-            y = self.dims.start_y + 1 + i
-            char = TREE_CHARS["SCROLL_BAR_FILLED"] if i == scroll_position else TREE_CHARS["SCROLL_BAR_EMPTY"]
-            try:
-                self.stdscr.addstr(y, x, char)
-            except curses.error:
-                pass
+        return f"{prefix}{title}{msg_count}"
 
 
 class ConversationDetailView:

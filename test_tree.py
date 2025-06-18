@@ -61,7 +61,9 @@ def test_tree_manager():
         node_type = "📁" if node.node_type == NodeType.FOLDER else "💬"
         print(f"{indent}{node_type} {node.name} ({node.path})")
     
-    return tree_manager
+    # Assert basic functionality
+    assert len(tree_order) == 6  # 3 folders + 3 conversations
+    assert work_folder in [node.id for node in tree_order]
 
 def test_organizer():
     """Test the ConversationOrganizer functionality."""
@@ -121,7 +123,9 @@ def test_organizer():
             name = conversation.title if conversation else node.name
             print(f"{indent}{node_type} {name}")
         
-        return organizer
+        # Assert functionality
+        assert len(organized) >= 3  # At least the conversations we added
+        assert organizer.organization_path.exists()
         
     finally:
         import os

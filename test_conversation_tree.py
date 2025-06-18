@@ -219,16 +219,20 @@ class TestConversationOrganizer(unittest.TestCase):
         
         organized = self.organizer.get_organized_conversations(self.conversations)
         
-        # Should have folder and conversation
-        self.assertEqual(len(organized), 2)
+        # Should have folder, organized conversation, and unorganized conversation
+        self.assertEqual(len(organized), 3)
         folder_item = organized[0]
-        conv_item = organized[1]
+        organized_conv_item = organized[1]
+        unorganized_conv_item = organized[2]
         
         self.assertIsNone(folder_item[1])  # Folder has no conversation
         self.assertEqual(folder_item[0].name, "Test Folder")
         
-        self.assertIsNotNone(conv_item[1])  # Conversation item
-        self.assertEqual(conv_item[1].id, "conv-1")
+        self.assertIsNotNone(organized_conv_item[1])  # Organized conversation item
+        self.assertEqual(organized_conv_item[1].id, "conv-1")
+        
+        self.assertIsNotNone(unorganized_conv_item[1])  # Unorganized conversation item
+        self.assertEqual(unorganized_conv_item[1].id, "conv-2")
     
     def test_save_and_load_organization(self):
         """Test saving and loading organization."""
@@ -240,8 +244,8 @@ class TestConversationOrganizer(unittest.TestCase):
         new_organizer = ConversationOrganizer(self.temp_file.name, debug=True)
         organized = new_organizer.get_organized_conversations(self.conversations)
         
-        # Should load the same organization
-        self.assertEqual(len(organized), 2)
+        # Should load the same organization (folder + organized conv + unorganized conv)
+        self.assertEqual(len(organized), 3)
         self.assertEqual(organized[0][0].name, "Saved Folder")
 
 

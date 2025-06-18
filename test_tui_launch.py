@@ -39,13 +39,16 @@ def test_tui_initialization():
             print(f"✅ Got {len(organized)} organized items")
             
         print("✅ All TUI components initialized successfully!")
-        return True
+        
+        # Assertions for pytest
+        assert tui is not None
+        assert tree_mode == ViewMode.CONVERSATION_TREE
         
     except Exception as e:
         print(f"❌ TUI initialization failed: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        assert False, f"TUI initialization failed: {e}"
 
 def test_tree_functionality():
     """Test tree functionality without curses."""
@@ -104,7 +107,9 @@ def test_tree_functionality():
             else:
                 print("⚠️  Tree structure incomplete")
                 
-            return True
+            # Assertions for pytest
+            assert len(organized) >= 2
+            assert has_folder and has_conv
             
         finally:
             import os
@@ -114,6 +119,7 @@ def test_tree_functionality():
         print(f"❌ Tree functionality test failed: {e}")
         import traceback
         traceback.print_exc()
+        assert False, f"Tree functionality test failed: {e}"
         return False
 
 def main():

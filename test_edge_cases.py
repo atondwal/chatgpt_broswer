@@ -38,11 +38,11 @@ def test_error_handling():
                 print(f"❌ {test_name}: Unexpected error type - {type(e).__name__}: {e}")
         
         print(f"✅ Error handling: {error_count}/{len(test_cases)} tests handled correctly")
-        return error_count == len(test_cases)
+        assert error_count == len(test_cases), f"Only {error_count}/{len(test_cases)} errors handled correctly"
         
     except Exception as e:
         print(f"❌ Error handling test failed: {e}")
-        return False
+        assert False, f"Error handling test failed: {e}"
 
 def test_cycle_prevention():
     """Test cycle prevention in tree operations."""
@@ -78,11 +78,11 @@ def test_cycle_prevention():
                 print(f"❌ {test_name}: Unexpected error - {type(e).__name__}: {e}")
         
         print(f"✅ Cycle prevention: {cycle_count}/{len(cycle_tests)} cycles prevented")
-        return cycle_count == len(cycle_tests)
+        assert cycle_count == len(cycle_tests), f"Only {cycle_count}/{len(cycle_tests)} cycles prevented correctly"
         
     except Exception as e:
         print(f"❌ Cycle prevention test failed: {e}")
-        return False
+        assert False, f"Cycle prevention test failed: {e}"
 
 def test_large_tree_performance():
     """Test performance with larger tree structures."""
@@ -126,14 +126,16 @@ def test_large_tree_performance():
         # Performance targets from design document
         if creation_time < 1.0 and traversal_time < 0.1:
             print("✅ Performance meets design targets")
-            return True
         else:
             print("⚠️  Performance slower than design targets but still acceptable")
-            return True
+        
+        # Assertions for pytest
+        assert creation_time < 5.0, f"Tree creation too slow: {creation_time:.3f}s"
+        assert traversal_time < 1.0, f"Tree traversal too slow: {traversal_time:.3f}s"
             
     except Exception as e:
         print(f"❌ Performance test failed: {e}")
-        return False
+        assert False, f"Performance test failed: {e}"
 
 def test_file_corruption_recovery():
     """Test file corruption recovery."""
@@ -158,17 +160,18 @@ def test_file_corruption_recovery():
             # Should create empty data
             if len(data.tree_nodes) == 0:
                 print("✅ Created empty data structure on corruption")
-                return True
             else:
                 print("❌ Did not create empty data structure")
-                return False
+            
+            # Assertions for pytest
+            assert len(data.tree_nodes) == 0, "Should create empty data structure on corruption"
                 
         finally:
             os.unlink(temp_path)
             
     except Exception as e:
         print(f"❌ File corruption test failed: {e}")
-        return False
+        assert False, f"File corruption test failed: {e}"
 
 def main():
     """Run all edge case tests."""
