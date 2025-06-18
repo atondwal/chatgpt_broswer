@@ -27,6 +27,7 @@ class ConversationTree:
         self.nodes: Dict[str, TreeNode] = {}  # All nodes (folders and conversations)
         self.root_nodes: Set[str] = set()      # Top-level node IDs
         self.metadata: Dict[str, dict] = {}    # Extra data for conversations
+        self.custom_order: Dict[str, List[str]] = {}  # Custom ordering for each parent
         self._load()
     
     def _load(self) -> None:
@@ -53,6 +54,7 @@ class ConversationTree:
                 
             self.root_nodes = set(data.get('root_nodes', []))
             self.metadata = data.get('metadata', {})
+            self.custom_order = data.get('custom_order', {})
             
             # Clean up any invalid references
             self._clean_invalid_references()
@@ -90,7 +92,8 @@ class ConversationTree:
                 for node in self.nodes.values()
             ],
             'root_nodes': list(self.root_nodes),
-            'metadata': self.metadata
+            'metadata': self.metadata,
+            'custom_order': self.custom_order
         }
         
         # Write to temp file first for safety
@@ -173,7 +176,7 @@ class ConversationTree:
                     self.root_nodes.discard(del_id)
                 del self.nodes[del_id]
     
-    def get_tree_items(self, conversations: List[any], sort_by_date: bool = True) -> List[Tuple[TreeNode, Optional[any], int]]:
+    def get_tree_items(self, conversations: List[any], sort_by_date: bool = True, use_custom_order: bool = True) -> List[Tuple[TreeNode, Optional[any], int]]:
         """Get all items in tree order for display."""
         # Create lookup for conversations
         conv_map = {c.id: c for c in conversations}
@@ -186,25 +189,45 @@ class ConversationTree:
         # Build tree recursively
         items = []
         
-        def add_children(node_ids: Set[str], depth: int = 0):
+        def add_children(node_ids: Set[str], depth: int = 0, parent_id: Optional[str] = None):
             # Filter out non-existent nodes
             valid_ids = [id for id in node_ids if id in self.nodes]
             
-            # Separate folders and conversations
-            folder_ids = [id for id in valid_ids if self.nodes[id].is_folder]
-            conv_ids = [id for id in valid_ids if not self.nodes[id].is_folder]
-            
-            # Sort folders by name
-            folder_ids.sort(key=lambda id: self.nodes[id].name.lower())
-            
-            # Sort conversations by date (newest first) or name
-            if sort_by_date:
-                conv_ids.sort(key=lambda id: conv_map.get(id).create_time or 0, reverse=True)
+            # Check if we have custom ordering for this parent
+            custom_key = parent_id or "root"
+            if use_custom_order and custom_key in self.custom_order:
+                # Use custom order, but include any new items at the end
+                custom_ordered = self.custom_order[custom_key]
+                ordered_ids = []
+                
+                # Add items in custom order if they exist
+                for item_id in custom_ordered:
+                    if item_id in valid_ids:
+                        ordered_ids.append(item_id)
+                        
+                # Add any new items not in custom order
+                for item_id in valid_ids:
+                    if item_id not in custom_ordered:
+                        ordered_ids.append(item_id)
+                        
+                sorted_ids = ordered_ids
             else:
-                conv_ids.sort(key=lambda id: self.nodes[id].name.lower())
-            
-            # Combine: folders first, then conversations
-            sorted_ids = folder_ids + conv_ids
+                # Use automatic sorting
+                # Separate folders and conversations
+                folder_ids = [id for id in valid_ids if self.nodes[id].is_folder]
+                conv_ids = [id for id in valid_ids if not self.nodes[id].is_folder]
+                
+                # Sort folders by name
+                folder_ids.sort(key=lambda id: self.nodes[id].name.lower())
+                
+                # Sort conversations by date (newest first) or name
+                if sort_by_date:
+                    conv_ids.sort(key=lambda id: conv_map.get(id).create_time or 0, reverse=True)
+                else:
+                    conv_ids.sort(key=lambda id: self.nodes[id].name.lower())
+                
+                # Combine: folders first, then conversations
+                sorted_ids = folder_ids + conv_ids
             
             for node_id in sorted_ids:
                     
@@ -212,12 +235,12 @@ class ConversationTree:
                 if node.is_folder:
                     items.append((node, None, depth))
                     if node.expanded:
-                        add_children(node.children, depth + 1)
+                        add_children(node.children, depth + 1, node_id)
                 else:
                     conv = conv_map.get(node_id)
                     items.append((node, conv, depth))
         
-        add_children(self.root_nodes)
+        add_children(self.root_nodes, 0, None)
         return items
     
     def rename_node(self, node_id: str, new_name: str) -> None:
@@ -235,3 +258,71 @@ class ConversationTree:
         if conv_id not in self.metadata:
             self.metadata[conv_id] = {}
         self.metadata[conv_id].update(kwargs)
+    
+    def move_item_up(self, item_id: str) -> bool:
+        """Move an item up within its parent's children list."""
+        if item_id not in self.nodes:
+            return False
+            
+        node = self.nodes[item_id]
+        parent_key = node.parent_id or "root"
+        
+        # Get current order for this parent
+        if parent_key not in self.custom_order:
+            # Initialize custom order from current siblings
+            if node.parent_id:
+                if node.parent_id not in self.nodes:
+                    return False
+                siblings = list(self.nodes[node.parent_id].children)
+            else:
+                siblings = list(self.root_nodes)
+            self.custom_order[parent_key] = siblings
+            
+        order = self.custom_order[parent_key]
+        
+        if item_id not in order:
+            order.append(item_id)
+            
+        # Find current position
+        current_idx = order.index(item_id)
+        if current_idx == 0:
+            return False  # Already at top
+            
+        # Swap with previous item
+        order[current_idx], order[current_idx - 1] = order[current_idx - 1], order[current_idx]
+        
+        return True
+    
+    def move_item_down(self, item_id: str) -> bool:
+        """Move an item down within its parent's children list."""
+        if item_id not in self.nodes:
+            return False
+            
+        node = self.nodes[item_id]
+        parent_key = node.parent_id or "root"
+        
+        # Get current order for this parent
+        if parent_key not in self.custom_order:
+            # Initialize custom order from current siblings
+            if node.parent_id:
+                if node.parent_id not in self.nodes:
+                    return False
+                siblings = list(self.nodes[node.parent_id].children)
+            else:
+                siblings = list(self.root_nodes)
+            self.custom_order[parent_key] = siblings
+            
+        order = self.custom_order[parent_key]
+        
+        if item_id not in order:
+            order.append(item_id)
+            
+        # Find current position
+        current_idx = order.index(item_id)
+        if current_idx == len(order) - 1:
+            return False  # Already at bottom
+            
+        # Swap with next item
+        order[current_idx], order[current_idx + 1] = order[current_idx + 1], order[current_idx]
+        
+        return True

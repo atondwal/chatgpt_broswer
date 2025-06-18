@@ -59,6 +59,14 @@ class EnhancedTreeView:
             return "expand_all"
         elif key == ord('-'):  # Collapse all
             return "collapse_all"
+        elif key == ord('K'):  # Move item up (Shift+K)
+            return "move_up"
+        elif key == ord('J'):  # Move item down (Shift+J)
+            return "move_down"
+        elif key == 566:  # Ctrl+Up
+            return "move_up"
+        elif key == 525:  # Ctrl+Down
+            return "move_down"
             
         return None
         

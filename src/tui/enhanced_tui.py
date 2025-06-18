@@ -121,7 +121,7 @@ class ChatGPTTUI:
             # Show help
             help_text = {
                 ViewMode.LIST: "↑/↓:Navigate Enter:Select t:Tree /:Search q:Quit",
-                ViewMode.TREE: f"↑/↓:Navigate Enter:Open n:New o:Sort({'Date' if self.sort_by_date else 'Name'}) ?:Help l:List q:Quit",
+                ViewMode.TREE: f"↑/↓:Navigate Enter:Open Shift+J/K:Reorder o:Sort({'Date' if self.sort_by_date else 'Name'}) ?:Help q:Quit",
                 ViewMode.SEARCH: "Type:Filter Enter:Apply ESC:Cancel",
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
@@ -253,6 +253,26 @@ class ChatGPTTUI:
                 if node.is_folder:
                     node.expanded = False
             self._refresh_tree()
+        elif result == "move_up":
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                if self.tree.move_item_up(node.id):
+                    self.tree.save()
+                    self._refresh_tree()
+                    self.status_message = f"Moved '{node.name}' up"
+                else:
+                    self.status_message = "Cannot move up"
+        elif result == "move_down":
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                if self.tree.move_item_down(node.id):
+                    self.tree.save()
+                    self._refresh_tree()
+                    self.status_message = f"Moved '{node.name}' down"
+                else:
+                    self.status_message = "Cannot move down"
         elif key == ord('n'):  # New folder
             self._create_folder()
         elif key == ord('r'):  # Rename
@@ -387,6 +407,10 @@ class ChatGPTTUI:
             "  Space   - Toggle folder expand/collapse",
             "  *       - Expand all folders",
             "  -       - Collapse all folders",
+            "",
+            "Reordering:",
+            "  Shift+J - Move item down",
+            "  Shift+K - Move item up",
             "",
             "Organization:",
             "  n       - Create new folder",
