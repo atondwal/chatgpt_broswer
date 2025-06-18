@@ -198,6 +198,7 @@ class FolderManager:
         
         def refresh_selection():
             """Refresh the folder selection display."""
+            nonlocal scroll_offset
             win.clear()
             win.border()
             

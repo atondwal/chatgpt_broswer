@@ -379,18 +379,34 @@ class ChatGPTTUI:
             return
             
         node, _, _ = self.tree_items[self.tree_selected]
-        folder_manager = FolderManager(self.stdscr)
-        dest_id = folder_manager.select_folder(self.tree_items, self.tree_selected)
         
-        if dest_id == node.id:
+        # Store current parent to detect cancellation
+        current_parent = node.parent_id if hasattr(node, 'parent_id') else None
+        
+        folder_manager = FolderManager(self.stdscr)
+        result = folder_manager.select_folder(self.tree_items, self.tree_selected)
+        
+        # If select_folder returns None and there are folders to choose from,
+        # it means either ESC was pressed or root was selected.
+        # We need to check if folders exist to distinguish.
+        has_folders = any(n.node_type == NodeType.FOLDER for n, _, _ in self.tree_items)
+        
+        if result is None and not has_folders:
+            # No folders exist, can't move
+            self.status_message = "No folders available"
+            return
+            
+        if result == node.id:
             self.status_message = "Cannot move to itself"
             return
             
+        # Note: result can be None (root) or a folder ID
+        # Both are valid destinations
         try:
-            self.organizer.tree_manager.move_node(node.id, dest_id)
+            self.organizer.tree_manager.move_node(node.id, result)
             self.organizer.save_organization()
             self._refresh_tree()
-            self.status_message = f"Moved to {'root' if dest_id is None else 'folder'}"
+            self.status_message = f"Moved to {'root' if result is None else 'folder'}"
         except Exception as e:
             self.status_message = f"Error: {e}"
 
