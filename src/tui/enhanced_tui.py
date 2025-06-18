@@ -76,7 +76,12 @@ class ChatGPTTUI:
         self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
         
         # Initialize tree
-        self._refresh_tree()
+        try:
+            self._refresh_tree()
+        except Exception as e:
+            if self.debug:
+                raise
+            self.status_message = f"Tree init error: {str(e)}"
         
         while self.running:
             try:
@@ -88,7 +93,7 @@ class ChatGPTTUI:
             except Exception as e:
                 if self.debug:
                     raise
-                self.status_message = f"Error: {e}"
+                self.status_message = f"Error: {str(e)[:50]}"
                 
     def _draw(self) -> None:
         """Draw current view."""

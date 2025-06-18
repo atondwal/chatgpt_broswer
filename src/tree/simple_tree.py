@@ -53,9 +53,27 @@ class ConversationTree:
                 
             self.root_nodes = set(data.get('root_nodes', []))
             self.metadata = data.get('metadata', {})
+            
+            # Clean up any invalid references
+            self._clean_invalid_references()
         except Exception:
             # If loading fails, start fresh
             pass
+    
+    def _clean_invalid_references(self) -> None:
+        """Remove invalid node references."""
+        # Clean root_nodes
+        self.root_nodes = {id for id in self.root_nodes if id in self.nodes}
+        
+        # Clean children references
+        for node in self.nodes.values():
+            node.children = {id for id in node.children if id in self.nodes}
+            
+        # Fix parent references
+        for node in self.nodes.values():
+            if node.parent_id and node.parent_id not in self.nodes:
+                node.parent_id = None
+                self.root_nodes.add(node.id)
     
     def save(self) -> None:
         """Save tree to disk."""
@@ -169,13 +187,14 @@ class ConversationTree:
         items = []
         
         def add_children(node_ids: Set[str], depth: int = 0):
+            # Filter out non-existent nodes
+            valid_ids = [id for id in node_ids if id in self.nodes]
+            
             # Sort: folders first, then by name
-            sorted_ids = sorted(node_ids, 
+            sorted_ids = sorted(valid_ids, 
                 key=lambda id: (not self.nodes[id].is_folder, self.nodes[id].name.lower()))
             
             for node_id in sorted_ids:
-                if node_id not in self.nodes:
-                    continue
                     
                 node = self.nodes[node_id]
                 if node.is_folder:
