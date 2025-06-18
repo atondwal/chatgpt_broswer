@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from src.core.models import Conversation
-from src.core.conversation_operations import ConversationLoader
+from src.core.simple_loader import load_conversations
 from src.tree.simple_tree import ConversationTree, TreeNode
-from src.tui.folder_management import get_folder_name_input, confirm_delete, FolderManager
-from src.tui.search_view import SearchView
-from src.tui.detail_view import ConversationDetailView
+from src.tui.simple_search import SearchView
+from src.tui.simple_detail import DetailView
+from src.tui.simple_input import get_input, confirm, select_folder
 
 
 class ViewMode(Enum):
@@ -37,8 +37,7 @@ class ChatGPTTUI:
             self.logger.setLevel(logging.DEBUG)
         
         # Load data
-        self.loader = ConversationLoader()
-        self.conversations = self.loader.load_conversations(conversations_file)
+        self.conversations = load_conversations(conversations_file)
         self.tree = ConversationTree(conversations_file)
         
         # UI state
@@ -74,7 +73,7 @@ class ChatGPTTUI:
         height, width = stdscr.getmaxyx()
         self.search_view = SearchView(stdscr, 0, 0, width, 1)
         self.search_view.set_search_callback(self._on_search_changed)
-        self.detail_view = ConversationDetailView(stdscr, 1, 0, width, height - 2)
+        self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
         
         # Initialize tree
         self._refresh_tree()
@@ -299,7 +298,7 @@ class ChatGPTTUI:
         
     def _create_folder(self) -> None:
         """Create new folder."""
-        name = get_folder_name_input(self.stdscr, "Folder name:")
+        name = get_input(self.stdscr, "Folder name:")
         if not name:
             return
             
@@ -323,7 +322,7 @@ class ChatGPTTUI:
             return
             
         node, _, _ = self.tree_items[self.tree_selected]
-        new_name = get_folder_name_input(self.stdscr, f"Rename '{node.name}':", node.name)
+        new_name = get_input(self.stdscr, f"Rename '{node.name}':", node.name)
         if not new_name or new_name == node.name:
             return
             
@@ -343,7 +342,7 @@ class ChatGPTTUI:
         node, _, _ = self.tree_items[self.tree_selected]
         item_type = "folder" if node.is_folder else "conversation"
         
-        if not confirm_delete(self.stdscr, node.name, item_type):
+        if not confirm(self.stdscr, f"Delete {item_type} '{node.name}'?"):
             return
             
         try:
@@ -360,8 +359,7 @@ class ChatGPTTUI:
             return
             
         node, _, _ = self.tree_items[self.tree_selected]
-        folder_manager = FolderManager(self.stdscr)
-        dest_id = folder_manager.select_folder(self.tree_items, self.tree_selected)
+        dest_id = select_folder(self.stdscr, self.tree_items)
         
         if dest_id == node.id:
             self.status_message = "Cannot move to itself"
