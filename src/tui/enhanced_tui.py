@@ -43,90 +43,17 @@ class ViewMode(Enum):
     HELP = "help"
 
 
-class ColorPair(Enum):
-    """Color pairs for the TUI."""
-    DEFAULT = COLOR_PAIRS["DEFAULT"]
-    HEADER = COLOR_PAIRS["HEADER"]
-    SELECTED = COLOR_PAIRS["SELECTED"]
-    BORDER = COLOR_PAIRS["BORDER"]
-    STATUS = COLOR_PAIRS["STATUS"]
-    USER_MESSAGE = COLOR_PAIRS["USER_MESSAGE"]
-    ASSISTANT_MESSAGE = COLOR_PAIRS["ASSISTANT_MESSAGE"]
-    SYSTEM_MESSAGE = COLOR_PAIRS["SYSTEM_MESSAGE"]
-    SEARCH_HIGHLIGHT = COLOR_PAIRS["SEARCH_HIGHLIGHT"]
-    ERROR = COLOR_PAIRS["ERROR"]
-    FOLDER = COLOR_PAIRS["FOLDER"]
-    CONVERSATION_TREE = COLOR_PAIRS["CONVERSATION_TREE"]
 
 
-@dataclass
-class WindowDimensions:
-    """Represents window dimensions and positions."""
-    height: int
-    width: int
-    start_y: int = 0
-    start_x: int = 0
-
-    @property
-    def max_y(self) -> int:
-        return self.start_y + self.height - 1
-
-    @property
-    def max_x(self) -> int:
-        return self.start_x + self.width - 1
 
 
-class StatusBar:
-    """Enhanced status bar with better messaging."""
+
+
+class ConversationListView(NavigableListView):
+    """Conversation list with search filtering."""
     
-    def __init__(self, stdscr, y: int, width: int):
-        self.stdscr = stdscr
-        self.y = y
-        self.width = width
-        self.message = ""
-        self.error = False
-
-    def show_message(self, message: str, is_error: bool = False) -> None:
-        """Display a message in the status bar."""
-        self.message = UIFormatter.truncate_text(message, self.width - 2)
-        self.error = is_error
-        self.refresh()
-
-    def show_shortcuts(self, shortcuts: Dict[str, str]) -> None:
-        """Display keyboard shortcuts in the status bar."""
-        shortcut_items = []
-        for key, desc in shortcuts.items():
-            # Use consistent shortcut formatting
-            if key in SHORTCUTS:
-                key_display = SHORTCUTS[key][0] if SHORTCUTS[key] else key
-            else:
-                key_display = key
-            shortcut_items.append(f"{key_display}: {desc}")
-        
-        shortcut_text = " | ".join(shortcut_items)
-        self.message = UIFormatter.truncate_text(shortcut_text, self.width - 2)
-        self.error = False
-        self.refresh()
-
-    def refresh(self) -> None:
-        """Refresh the status bar display."""
-        try:
-            self.stdscr.move(self.y, 0)
-            self.stdscr.clrtoeol()
-            
-            color = ColorPair.ERROR.value if self.error else ColorPair.STATUS.value
-            if self.message:
-                self.stdscr.addstr(self.y, 1, self.message, curses.color_pair(color))
-        except curses.error:
-            pass
-
-
-class EnhancedConversationListView(NavigableListView):
-    """Enhanced conversation list view with improved navigation and search."""
-    
-    def __init__(self, stdscr, dimensions: WindowDimensions):
-        super().__init__(stdscr, dimensions.start_y, dimensions.start_x, dimensions.width, dimensions.height)
-        self.dims = dimensions
+    def __init__(self, stdscr, y, x, width, height):
+        super().__init__(stdscr, y, x, width, height)
         self.conversations: List[Conversation] = []
         self.filtered_conversations: List[Tuple[int, Conversation]] = []
         self.search_term = ""
@@ -214,12 +141,11 @@ class EnhancedConversationListView(NavigableListView):
         return None
 
 
-class EnhancedTreeListView(NavigableListView):
-    """Enhanced tree view with folder management capabilities."""
+class TreeView(NavigableListView):
+    """Tree view with folder management."""
     
-    def __init__(self, stdscr, dimensions: WindowDimensions, organizer: ConversationOrganizer):
-        super().__init__(stdscr, dimensions.start_y, dimensions.start_x, dimensions.width, dimensions.height)
-        self.dims = dimensions
+    def __init__(self, stdscr, y, x, width, height, organizer: ConversationOrganizer):
+        super().__init__(stdscr, y, x, width, height)
         self.organizer = organizer
         self.tree_items: List[Tuple[TreeNode, Optional[Conversation], int]] = []  # (node, conversation, depth)
         self.conversations_map: Dict[str, Conversation] = {}
@@ -358,8 +284,8 @@ class EnhancedTreeListView(NavigableListView):
             self.refresh_tree()
 
 
-class EnhancedChatGPTTUI:
-    """Enhanced TUI with improved navigation and tree management."""
+class ChatGPTTUI:
+    """Terminal interface for browsing ChatGPT conversations."""
     
     def __init__(self, conversations_file: str, debug: bool = False):
         self.conversations_file = conversations_file
@@ -376,9 +302,8 @@ class EnhancedChatGPTTUI:
         self.running = True
         self.status_message = ""
         
-        # UI components (will be initialized in run)
+        # UI components
         self.stdscr = None
-        self.status_bar = None
         self.list_view = None
         self.tree_view = None
         self.search_view = None
@@ -418,41 +343,29 @@ class EnhancedChatGPTTUI:
         """Initialize color pairs."""
         curses.start_color()
         curses.use_default_colors()
-        
-        # Define color pairs
-        curses.init_pair(ColorPair.DEFAULT.value, curses.COLOR_WHITE, -1)
-        curses.init_pair(ColorPair.HEADER.value, curses.COLOR_CYAN, curses.COLOR_BLUE)
-        curses.init_pair(ColorPair.SELECTED.value, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        curses.init_pair(ColorPair.BORDER.value, curses.COLOR_BLUE, -1)
-        curses.init_pair(ColorPair.STATUS.value, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(ColorPair.ERROR.value, curses.COLOR_WHITE, curses.COLOR_RED)
-        curses.init_pair(ColorPair.FOLDER.value, curses.COLOR_YELLOW, -1)
-        curses.init_pair(ColorPair.CONVERSATION_TREE.value, curses.COLOR_GREEN, -1)
+        for i, (fg, bg) in enumerate([
+            (curses.COLOR_WHITE, -1),      # DEFAULT
+            (curses.COLOR_CYAN, curses.COLOR_BLUE),   # HEADER
+            (curses.COLOR_BLACK, curses.COLOR_WHITE), # SELECTED
+            (curses.COLOR_BLUE, -1),       # BORDER
+            (curses.COLOR_WHITE, curses.COLOR_BLUE),  # STATUS
+        ], 1):
+            curses.init_pair(i, fg, bg)
         
     def _init_ui_components(self) -> None:
         """Initialize UI components."""
         height, width = self.stdscr.getmaxyx()
+        content_height = height - 1  # Leave space for status
         
-        # Status bar at bottom
-        status_y = height - 1
-        self.status_bar = StatusBar(self.stdscr, status_y, width)
-        
-        # Main content area
-        content_height = height - UI_CONSTANTS["STATUS_BAR_HEIGHT"]
-        content_dims = WindowDimensions(content_height, width, 0, 0)
-        
-        # Initialize views
-        self.list_view = EnhancedConversationListView(self.stdscr, content_dims)
+        self.list_view = ConversationListView(self.stdscr, 0, 0, width, content_height)
         self.list_view.set_conversations(self.conversations)
         
-        self.tree_view = EnhancedTreeListView(self.stdscr, content_dims, self.organizer)
+        self.tree_view = TreeView(self.stdscr, 0, 0, width, content_height, self.organizer)
         self.tree_view.set_conversations(self.conversations)
         
-        # Initialize search view (positioned at top)
         self.search_view = SearchView(self.stdscr, 0, 0, width, 1)
         self.search_view.set_search_callback(self._on_search_changed)
         
-        # Initialize detail view (full content area)
         self.detail_view = ConversationDetailView(self.stdscr, 1, 0, width, content_height - 1)
         
     def _handle_input(self, key: int) -> None:
@@ -471,210 +384,146 @@ class EnhancedChatGPTTUI:
             self._process_command(result)
             
     def _process_command(self, command: Optional[str]) -> None:
-        """Process a command from view input handling."""
+        """Process command from view."""
         if not command:
             return
             
+        commands = {
+            "quit": lambda: setattr(self, 'running', False),
+            "start_search": self._start_search,
+            "search_cancelled": self._cancel_search,
+            "search_submitted": self._submit_search,
+            "select_conversation": self._select_conversation,
+            "close_detail": self._close_detail,
+            "toggle_tree_view": lambda: self._switch_view(ViewMode.CONVERSATION_TREE, "tree"),
+            "toggle_list_view": lambda: self._switch_view(ViewMode.CONVERSATION_LIST, "list"),
+            "show_help": self._show_help,
+        }
+        
+        # Tree-only commands
+        if self.current_view == ViewMode.CONVERSATION_TREE:
+            commands.update({
+                "toggle_folder": lambda: (self.tree_view.toggle_folder(), setattr(self, 'status_message', "Toggled folder")),
+                "create_folder": self._create_folder,
+                "rename_item": self._rename_item,
+                "delete_item": self._delete_item,
+                "move_item": self._move_item,
+            })
+        
         try:
-            if command == "quit":
-                self.running = False
-            elif command == "start_search":
-                self._start_search()
-            elif command == "search_cancelled":
-                self._cancel_search()
-            elif command == "search_submitted":
-                self._submit_search()
-            elif command == "select_conversation":
-                self._select_conversation()
-            elif command == "close_detail":
-                self._close_detail()
-            elif command == "toggle_tree_view":
-                self.current_view = ViewMode.CONVERSATION_TREE
-                self.status_message = "Switched to tree view"
-            elif command == "toggle_list_view":
-                self.current_view = ViewMode.CONVERSATION_LIST  
-                self.status_message = "Switched to list view"
-            elif command == "toggle_folder" and self.current_view == ViewMode.CONVERSATION_TREE:
-                self.tree_view.toggle_folder()
-                self.status_message = "Toggled folder"
-            elif command == "create_folder" and self.current_view == ViewMode.CONVERSATION_TREE:
-                self._create_folder()
-            elif command == "rename_item" and self.current_view == ViewMode.CONVERSATION_TREE:
-                self._rename_item()
-            elif command == "delete_item" and self.current_view == ViewMode.CONVERSATION_TREE:
-                self._delete_item()
-            elif command == "move_item" and self.current_view == ViewMode.CONVERSATION_TREE:
-                self._move_item()
-            elif command == "show_help":
-                self._show_help()
+            if command in commands:
+                result = commands[command]()
+                if isinstance(result, tuple):  # Handle multiple operations
+                    pass  # Already executed
             else:
-                self.status_message = f"Command not implemented: {command}"
-                
+                self.status_message = f"Unknown command: {command}"
         except Exception as e:
             self.status_message = f"Error: {str(e)}"
-            self.logger.error(f"Error processing command {command}: {e}")
+            self.logger.error(f"Command {command} failed: {e}")
             
     def _create_folder(self) -> None:
-        """Create a new folder with user input."""
+        """Create new folder."""
+        name = get_folder_name_input(self.stdscr, "Folder name:")
+        if not name:
+            return
+            
         try:
-            # Get folder name from user
-            folder_name = get_folder_name_input(self.stdscr, "Enter folder name:")
-            
-            if not folder_name:
-                self.status_message = "Folder creation cancelled"
-                return
-            
-            # Get parent folder if a folder is selected
+            # Use selected folder as parent if it's a folder
             parent_id = None
-            if self.current_view == ViewMode.CONVERSATION_TREE:
-                selected_node = self.tree_view.get_selected_node()
-                if selected_node and selected_node.node_type == NodeType.FOLDER:
-                    parent_id = selected_node.id
+            selected = self.tree_view.get_selected_node()
+            if selected and selected.node_type == NodeType.FOLDER:
+                parent_id = selected.id
             
-            # Create the folder
-            folder_id = self.organizer.create_folder(folder_name, parent_id)
-            
-            # Refresh tree view
-            if hasattr(self, 'tree_view'):
-                self.tree_view.refresh_tree()
-            
-            show_success_message(self.stdscr, f"Created folder '{folder_name}'")
-            
+            self.organizer.create_folder(name, parent_id)
+            self.tree_view.refresh_tree()
+            self.status_message = f"Created '{name}'"
         except Exception as e:
-            show_error_message(self.stdscr, f"Failed to create folder: {str(e)}")
+            self.status_message = f"Create failed: {e}"
             
     def _rename_item(self) -> None:
-        """Rename the selected item."""
-        if self.current_view != ViewMode.CONVERSATION_TREE:
-            self.status_message = "Rename only available in tree view"
+        """Rename selected item."""
+        selected = self.tree_view.get_selected_node()
+        if not selected:
+            self.status_message = "Nothing selected"
+            return
+            
+        new_name = get_folder_name_input(self.stdscr, f"Rename '{selected.name}':", selected.name)
+        if not new_name or new_name == selected.name:
             return
             
         try:
-            selected_node = self.tree_view.get_selected_node()
-            if not selected_node:
-                self.status_message = "No item selected"
-                return
-            
-            # Get new name from user
-            current_name = selected_node.name
-            new_name = get_folder_name_input(
-                self.stdscr, 
-                f"Rename '{current_name}':",
-                current_name
-            )
-            
-            if not new_name or new_name == current_name:
-                self.status_message = "Rename cancelled"
-                return
-            
-            # Update the node name
-            selected_node.name = new_name
-            
-            # Save changes
+            selected.name = new_name
             self.organizer.save_organization()
-            
-            # Refresh tree view
             self.tree_view.refresh_tree()
-            
-            show_success_message(self.stdscr, f"Renamed to '{new_name}'")
-            
+            self.status_message = f"Renamed to '{new_name}'"
         except Exception as e:
-            show_error_message(self.stdscr, f"Failed to rename: {str(e)}")
+            self.status_message = f"Rename failed: {e}"
             
     def _delete_item(self) -> None:
-        """Delete the selected item."""
-        if self.current_view != ViewMode.CONVERSATION_TREE:
-            self.status_message = "Delete only available in tree view"
+        """Delete selected item."""
+        selected = self.tree_view.get_selected_node()
+        if not selected:
+            self.status_message = "Nothing selected"
+            return
+            
+        item_type = "folder" if selected.node_type == NodeType.FOLDER else "conversation"
+        if not confirm_delete(self.stdscr, selected.name, item_type):
             return
             
         try:
-            selected_node = self.tree_view.get_selected_node()
-            if not selected_node:
-                self.status_message = "No item selected"
-                return
-            
-            # Confirm deletion
-            item_type = "folder" if selected_node.node_type == NodeType.FOLDER else "conversation"
-            if not confirm_delete(self.stdscr, selected_node.name, item_type):
-                self.status_message = "Delete cancelled"
-                return
-            
-            # Delete the node
-            self.organizer.tree_manager.delete_node(selected_node.id)
-            
-            # Save changes
+            self.organizer.tree_manager.delete_node(selected.id)
             self.organizer.save_organization()
-            
-            # Refresh tree view
             self.tree_view.refresh_tree()
-            
-            show_success_message(self.stdscr, f"Deleted {item_type} '{selected_node.name}'")
-            
+            self.status_message = f"Deleted {item_type}"
         except Exception as e:
-            show_error_message(self.stdscr, f"Failed to delete: {str(e)}")
+            self.status_message = f"Delete failed: {e}"
             
     def _move_item(self) -> None:
-        """Move the selected item to a different folder."""
-        if self.current_view != ViewMode.CONVERSATION_TREE:
-            self.status_message = "Move only available in tree view"
+        """Move selected item."""
+        selected = self.tree_view.get_selected_node()
+        if not selected:
+            self.status_message = "Nothing selected"
+            return
+            
+        folder_manager = FolderManager(self.stdscr)
+        current_pos = self.tree_view.scroll_state.selected
+        destination_id = folder_manager.select_folder(self.tree_view.tree_items, current_pos)
+        
+        if destination_id == selected.id:
+            self.status_message = "Cannot move to itself"
             return
             
         try:
-            selected_node = self.tree_view.get_selected_node()
-            if not selected_node:
-                self.status_message = "No item selected"
-                return
-            
-            # Get destination folder
-            folder_manager = FolderManager(self.stdscr)
-            selected_item = self.tree_view.get_selected_item()
-            current_selection = self.tree_view.scroll_state.selected if selected_item else 0
-            
-            destination_id = folder_manager.select_folder(
-                self.tree_view.tree_items, 
-                current_selection
-            )
-            
-            if destination_id == selected_node.id:
-                self.status_message = "Cannot move item to itself"
-                return
-            
-            # Move the node
-            self.organizer.tree_manager.move_node(selected_node.id, destination_id)
-            
-            # Save changes
+            self.organizer.tree_manager.move_node(selected.id, destination_id)
             self.organizer.save_organization()
-            
-            # Refresh tree view
             self.tree_view.refresh_tree()
-            
-            dest_name = "root" if destination_id is None else "selected folder"
-            show_success_message(self.stdscr, f"Moved '{selected_node.name}' to {dest_name}")
-            
+            dest = "root" if destination_id is None else "folder"
+            self.status_message = f"Moved to {dest}"
         except Exception as e:
-            show_error_message(self.stdscr, f"Failed to move: {str(e)}")
+            self.status_message = f"Move failed: {e}"
+    
+    def _switch_view(self, view: ViewMode, name: str) -> None:
+        """Switch to specified view."""
+        self.current_view = view
+        self.status_message = f"Switched to {name} view"
     
     def _start_search(self) -> None:
         """Start search mode."""
         self.current_view = ViewMode.SEARCH
         self.search_view.activate()
-        self.status_message = "Search mode - type to filter conversations"
+        self.status_message = "Search mode"
     
     def _cancel_search(self) -> None:
-        """Cancel search and return to previous view."""
+        """Cancel search."""
         self.search_view.deactivate()
-        self.current_view = ViewMode.CONVERSATION_LIST
-        self.status_message = "Search cancelled"
+        self._switch_view(ViewMode.CONVERSATION_LIST, "list")
     
     def _submit_search(self) -> None:
-        """Submit search and return to list view with filtered results."""
-        search_term = self.search_view.get_search_term()
+        """Submit search."""
+        term = self.search_view.get_search_term()
         self.search_view.deactivate()
         self.current_view = ViewMode.CONVERSATION_LIST
-        if search_term:
-            self.status_message = f"Showing results for: '{search_term}'"
-        else:
-            self.status_message = "Showing all conversations"
+        self.status_message = f"Results for: '{term}'" if term else "All conversations"
     
     def _on_search_changed(self, search_term: str) -> None:
         """Handle search term changes."""
@@ -704,88 +553,81 @@ class EnhancedChatGPTTUI:
         self.status_message = "Returned to conversation list"
             
     def _show_help(self) -> None:
-        """Show help shortcuts."""
-        if self.current_view == ViewMode.CONVERSATION_LIST:
-            shortcuts = {
-                "↑/↓": "Navigate",
-                "Enter": "Select",
-                "t": "Tree view", 
-                "/": "Search",
-                "q": "Quit"
-            }
-        elif self.current_view == ViewMode.CONVERSATION_TREE:
-            shortcuts = {
-                "↑/↓": "Navigate",
-                "Enter": "Open/Toggle",
-                "Space": "Toggle folder",
-                "n": "New folder",
-                "r": "Rename",
-                "d": "Delete",
-                "m": "Move",
-                "l": "List view",
-                "q": "Quit"
-            }
-        elif self.current_view == ViewMode.SEARCH:
-            shortcuts = {
-                "Type": "Filter",
-                "Enter": "Apply filter",
-                "ESC": "Cancel",
-            }
-        elif self.current_view == ViewMode.CONVERSATION_DETAIL:
-            shortcuts = {
-                "↑/↓": "Scroll",
-                "PgUp/PgDn": "Page scroll",
-                "Home/End": "Top/Bottom",
-                "q/ESC": "Back to list"
-            }
-        else:
-            shortcuts = {"?": "Help", "q": "Quit"}
-            
-        self.status_bar.show_shortcuts(shortcuts)
+        """Show shortcuts."""
+        help_text = {
+            ViewMode.CONVERSATION_LIST: "↑/↓:Navigate Enter:Select t:Tree /:Search q:Quit",
+            ViewMode.CONVERSATION_TREE: "↑/↓:Navigate Enter:Open n:New r:Rename d:Delete m:Move l:List q:Quit",
+            ViewMode.SEARCH: "Type:Filter Enter:Apply ESC:Cancel",
+            ViewMode.CONVERSATION_DETAIL: "↑/↓:Scroll PgUp/PgDn:Page q/ESC:Back",
+        }
+        
+        text = help_text.get(self.current_view, "q:Quit")
+        height, width = self.stdscr.getmaxyx()
+        status_y = height - 1
+        
+        try:
+            truncated = text[:width-2]
+            self.stdscr.addstr(status_y, 1, truncated, curses.color_pair(5))
+        except curses.error:
+            pass
         
     def _draw_screen(self) -> None:
-        """Draw the entire screen."""
+        """Draw screen."""
         self.stdscr.clear()
         
-        if self.current_view == ViewMode.CONVERSATION_LIST:
-            self.list_view.draw()
-        elif self.current_view == ViewMode.CONVERSATION_TREE:
-            self.tree_view.draw()
+        # Draw main content
+        views = {
+            ViewMode.CONVERSATION_LIST: self.list_view,
+            ViewMode.CONVERSATION_TREE: self.tree_view,
+            ViewMode.CONVERSATION_DETAIL: self.detail_view,
+        }
+        
+        if self.current_view in views:
+            views[self.current_view].draw()
         elif self.current_view == ViewMode.SEARCH:
-            # Draw the current list view in the background
-            self.list_view.draw()
-            # Draw search overlay on top
-            self.search_view.draw()
-        elif self.current_view == ViewMode.CONVERSATION_DETAIL:
-            self.detail_view.draw()
+            self.list_view.draw()  # Background
+            self.search_view.draw()  # Overlay
             
-        # Update status bar
-        if self.status_message:
-            self.status_bar.show_message(self.status_message)
-            self.status_message = ""  # Clear after showing
-        else:
-            self._show_help()  # Show help by default
-            
+        # Draw status
+        self._draw_status()
         self.stdscr.refresh()
+    
+    def _draw_status(self) -> None:
+        """Draw status line."""
+        height, width = self.stdscr.getmaxyx()
+        status_y = height - 1
+        
+        try:
+            self.stdscr.move(status_y, 0)
+            self.stdscr.clrtoeol()
+            
+            if self.status_message:
+                msg = self.status_message[:width-2]  # Truncate if needed
+                self.stdscr.addstr(status_y, 1, msg, curses.color_pair(5))  # STATUS color
+                self.status_message = ""  # Clear after showing
+            else:
+                self._show_help()  # Show shortcuts by default
+        except curses.error:
+            pass
 
 
 def main():
-    """Main entry point for enhanced TUI."""
-    parser = argparse.ArgumentParser(description="Enhanced ChatGPT History Browser")
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description="ChatGPT History Browser")
     parser.add_argument("conversations_file", help="Path to conversations.json file")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     
     args = parser.parse_args()
     
     if not Path(args.conversations_file).exists():
-        print(f"Error: Conversations file not found: {args.conversations_file}")
+        print(f"File not found: {args.conversations_file}")
         sys.exit(1)
     
     try:
-        tui = EnhancedChatGPTTUI(args.conversations_file, debug=args.debug)
+        tui = ChatGPTTUI(args.conversations_file, debug=args.debug)
         curses.wrapper(tui.run)
     except Exception as e:
-        print(f"Error running TUI: {e}")
+        print(f"Error: {e}")
         if args.debug:
             raise
         sys.exit(1)

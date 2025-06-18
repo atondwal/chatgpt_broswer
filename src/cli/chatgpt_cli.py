@@ -176,10 +176,10 @@ class ChatGPTBrowserCLI:
         """Launch the Terminal User Interface."""
         try:
             # Import here to avoid circular imports and make TUI optional
-            from src.tui.enhanced_tui import EnhancedChatGPTTUI
+            from src.tui.enhanced_tui import ChatGPTTUI
             import curses
             
-            tui = EnhancedChatGPTTUI(
+            tui = ChatGPTTUI(
                 conversations_file=str(self.conversations_path),
                 debug=self.debug
             )
