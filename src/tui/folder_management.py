@@ -6,7 +6,7 @@ Provides interactive folder operations like create, rename, delete.
 """
 
 import curses
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from src.tree.tree_constants import UI_CONSTANTS, COLOR_PAIRS
 from src.tree.tree_types import NodeType
 
@@ -172,7 +172,7 @@ class FolderManager:
         except (KeyboardInterrupt, curses.error):
             pass
     
-    def select_folder(self, tree_items, current_selection: int) -> Optional[str]:
+    def select_folder(self, tree_items: List[Tuple], current_selection: int) -> Optional[str]:
         """Let user select a folder from the tree for moving items."""
         if not tree_items:
             return None
@@ -186,7 +186,6 @@ class FolderManager:
         start_x = (width - dialog_width) // 2
         
         win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
-        win.border()
         
         # Filter to only show folders
         folders = [(i, item) for i, item in enumerate(tree_items) 
@@ -196,9 +195,9 @@ class FolderManager:
         selected_idx = 0
         scroll_offset = 0
         
-        def refresh_selection():
-            """Refresh the folder selection display."""
-            nonlocal scroll_offset
+        # Main loop
+        while True:
+            # Clear and redraw window
             win.clear()
             win.border()
             
@@ -206,7 +205,7 @@ class FolderManager:
             
             visible_height = dialog_height - 4
             
-            # Adjust scroll
+            # Adjust scroll offset to keep selection visible
             if selected_idx < scroll_offset:
                 scroll_offset = selected_idx
             elif selected_idx >= scroll_offset + visible_height:
@@ -235,15 +234,16 @@ class FolderManager:
                 # Highlight if selected
                 attr = curses.A_REVERSE if folder_idx == selected_idx else 0
                 
-                win.addstr(2 + i, 2, display_text, attr)
+                try:
+                    win.addstr(2 + i, 2, display_text, attr)
+                except curses.error:
+                    pass
             
             # Show instructions
             win.addstr(dialog_height - 2, 2, "↑/↓: Navigate, Enter: Select, ESC: Cancel")
             win.refresh()
-        
-        refresh_selection()
-        
-        while True:
+            
+            # Handle input
             try:
                 key = win.getch()
                 
@@ -257,13 +257,13 @@ class FolderManager:
                         else:
                             return tree_node.id
                     return None
-                elif key == curses.KEY_UP:
-                    selected_idx = max(0, selected_idx - 1)
-                elif key == curses.KEY_DOWN:
-                    selected_idx = min(len(folders) - 1, selected_idx + 1)
-                
-                refresh_selection()
-                
+                elif key == curses.KEY_UP or key == ord('k'):  # Up arrow or k
+                    if selected_idx > 0:
+                        selected_idx -= 1
+                elif key == curses.KEY_DOWN or key == ord('j'):  # Down arrow or j  
+                    if selected_idx < len(folders) - 1:
+                        selected_idx += 1
+                        
             except KeyboardInterrupt:
                 return None
             except curses.error:
