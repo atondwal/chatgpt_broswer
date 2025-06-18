@@ -29,6 +29,8 @@ class TreeView:
         self.offset = 0
         self.tree_items: List[Tuple[TreeNode, Optional[any], int]] = []
         self.selected_items: set = set()  # Multi-selected items
+        self.last_key = None  # For vim-like double-key commands
+        self.last_key_time = 0  # Timestamp for double-key timeout
         
     def set_items(self, items: List[Tuple[TreeNode, Optional[any], int]]) -> None:
         """Update tree items."""
@@ -44,11 +46,57 @@ class TreeView:
         if not self.tree_items:
             return None
             
+        import time
+        current_time = time.time()
+        
+        # Handle double-key commands (gg, dd, yy, zz)
+        if self.last_key and current_time - self.last_key_time < 0.5:
+            if self.last_key == ord('g') and key == ord('g'):
+                self.selected = 0
+                self._ensure_visible()
+                self.last_key = None
+                return None
+            elif self.last_key == ord('d') and key == ord('d'):
+                self.last_key = None
+                return "delete"
+            elif self.last_key == ord('y') and key == ord('y'):
+                self.last_key = None
+                return "copy"
+            elif self.last_key == ord('z') and key == ord('z'):
+                self._center_on_selected()
+                self.last_key = None
+                return None
+        
+        # Store key for potential double-key commands
+        if key in (ord('g'), ord('d'), ord('y'), ord('z')):
+            self.last_key = key
+            self.last_key_time = current_time
+            return None
+        else:
+            self.last_key = None
+            
         # Navigation
         if key in (curses.KEY_UP, ord('k')):
             self.move_up()
         elif key in (curses.KEY_DOWN, ord('j')):
             self.move_down()
+        elif key == 4:  # Ctrl+D
+            self.move_down(self.height // 2)
+        elif key == 21:  # Ctrl+U  
+            self.move_up(self.height // 2)
+        elif key == 6:  # Ctrl+F
+            self.move_down(self.height - 1)
+        elif key == 2:  # Ctrl+B
+            self.move_up(self.height - 1)
+        elif key == ord('H'):  # Jump to top of screen
+            self.selected = self.offset
+            self._ensure_visible()
+        elif key == ord('M'):  # Jump to middle of screen
+            self.selected = min(len(self.tree_items) - 1, self.offset + self.height // 2)
+            self._ensure_visible()
+        elif key == ord('L'):  # Jump to bottom of screen
+            self.selected = min(len(self.tree_items) - 1, self.offset + self.height - 1)
+            self._ensure_visible()
         elif key in (curses.KEY_HOME, ord('g')):
             self.selected = 0
         elif key in (curses.KEY_END, ord('G')):
@@ -73,18 +121,67 @@ class TreeView:
             return "move_up"
         elif key == 525:  # Ctrl+Down
             return "move_down"
+        # Quick actions
+        elif key == ord('x'):  # Quick delete
+            return "delete"
+        elif key == ord('u'):  # Undo
+            return "undo"
+        elif key == ord('.'):  # Repeat last action
+            return "repeat"
+        elif key == ord('p'):  # Paste/duplicate
+            return "paste"
+        # Function keys
+        elif key == curses.KEY_F1:  # F1 - Help
+            return "help"
+        elif key == curses.KEY_F2:  # F2 - Rename
+            return "rename"
+        elif key == curses.KEY_F5:  # F5 - Refresh
+            return "refresh"
+        elif key == curses.KEY_DC:  # Delete key
+            return "delete"
+        elif key == curses.KEY_IC:  # Insert key
+            return "new_folder"
+        # Visual mode and selection
+        elif key == ord('V'):  # Visual mode
+            return "visual_mode"
+        elif key == ord('>'):  # Indent
+            return "indent"
+        elif key == ord('<'):  # Outdent  
+            return "outdent"
+        # Quick filters
+        elif key == ord('f'):  # Quick filter
+            return "quick_filter"
+        elif key == ord('F'):  # Show only folders
+            return "filter_folders"
+        elif key == ord('C'):  # Show only conversations
+            return "filter_conversations"
+        elif key == ord('a'):  # Show all
+            return "show_all"
+        # Numeric depth control
+        elif ord('0') <= key <= ord('9'):
+            depth = key - ord('0')
+            return f"expand_depth_{depth}"
             
         return None
         
-    def move_up(self) -> None:
-        """Move selection up."""
-        self.selected = max(0, self.selected - 1)
+    def move_up(self, steps: int = 1) -> None:
+        """Move selection up by specified steps."""
+        self.selected = max(0, self.selected - steps)
         self._ensure_visible()
         
-    def move_down(self) -> None:
-        """Move selection down."""
-        self.selected = min(len(self.tree_items) - 1, self.selected + 1)
+    def move_down(self, steps: int = 1) -> None:
+        """Move selection down by specified steps."""
+        self.selected = min(len(self.tree_items) - 1, self.selected + steps)
         self._ensure_visible()
+        
+    def _center_on_selected(self) -> None:
+        """Center the view on the selected item."""
+        if not self.tree_items:
+            return
+        # Calculate offset to center selected item
+        target_offset = self.selected - self.height // 2
+        max_offset = max(0, len(self.tree_items) - self.height + 1)
+        self.offset = max(0, min(max_offset, target_offset))
         
     def _ensure_visible(self) -> None:
         """Ensure selected item is visible."""

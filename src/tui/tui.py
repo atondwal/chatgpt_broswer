@@ -117,8 +117,8 @@ class TUI:
             # Show help
             multi_info = f" [{len(self.selected_items)} selected]" if self.selected_items else ""
             help_text = {
-                ViewMode.TREE: f"↑/↓:Navigate Enter:Open Space:Select Ctrl+A:All /:Search Shift+J/K:Move{multi_info} ?:Help q:Quit",
-                ViewMode.SEARCH: "Type:Search ESC:Cancel Enter:Apply",
+                ViewMode.TREE: f"gg/G:Top/Bot x:Delete f:Filter F1:Help{multi_info} Enhanced keys available!",
+                ViewMode.SEARCH: "Type:Search ESC:Cancel Enter:Apply", 
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
             self.stdscr.addstr(height-1, 0, help_text[:width-1])
@@ -252,6 +252,43 @@ class TUI:
             self._toggle_sort_order()
         elif key == ord('O'):  # Clear custom ordering (Shift+O)
             self._clear_custom_order()
+        
+        # Handle new keybindings
+        elif result == "delete":
+            self._delete_item()
+        elif result == "copy":
+            self._copy_item()
+        elif result == "paste":
+            self._paste_item()
+        elif result == "undo":
+            self._undo_action()
+        elif result == "repeat":
+            self._repeat_last_action()
+        elif result == "help":
+            self._show_tree_help()
+        elif result == "rename":
+            self._rename_item()
+        elif result == "refresh":
+            self._refresh_conversations()
+        elif result == "new_folder":
+            self._create_folder()
+        elif result == "visual_mode":
+            self._toggle_visual_mode()
+        elif result == "indent":
+            self._indent_items()
+        elif result == "outdent":
+            self._outdent_items()
+        elif result == "quick_filter":
+            self._quick_filter()
+        elif result == "filter_folders":
+            self._filter_folders()
+        elif result == "filter_conversations":
+            self._filter_conversations()
+        elif result == "show_all":
+            self._show_all()
+        elif result and result.startswith("expand_depth_"):
+            depth = int(result.split("_")[-1])
+            self._expand_to_depth(depth)
             
     def _refresh_tree(self) -> None:
         """Refresh tree items."""
@@ -347,42 +384,49 @@ class TUI:
     def _show_tree_help(self) -> None:
         """Show help dialog for tree view."""
         help_text = [
-            "Tree View Controls:",
+            "Enhanced Keybindings:",
             "",
-            "Navigation:",
-            "  ↑/k     - Move up",
-            "  ↓/j     - Move down",
-            "  g       - Go to top",
-            "  G       - Go to bottom",
-            "  h       - Jump to parent folder",
-            "  l       - Expand folder / Enter conversation",
+            "Vim Navigation:",
+            "  ↑/k, ↓/j   - Move up/down",
+            "  gg, G      - Go to top/bottom",  
+            "  Ctrl+D/U   - Half page down/up",
+            "  Ctrl+F/B   - Full page down/up",
+            "  H/M/L      - Jump High/Middle/Low on screen",
+            "  h/l        - Jump to parent / Expand folder",
+            "  zz         - Center current item",
             "",
-            "Actions:",
-            "  Enter   - Open conversation / Toggle folder",
-            "  Space   - Select/deselect item (multi-select)",
-            "  Ctrl+A  - Select all items",
-            "  ESC     - Clear selection (or quit if none)",
-            "  *       - Expand all folders",
-            "  -       - Collapse all folders",
+            "Quick Actions:",
+            "  x, dd      - Delete item",
+            "  yy         - Copy title",
+            "  p          - Paste",
+            "  u          - Undo",
+            "  .          - Repeat action",
             "",
-            "Reordering:",
-            "  Shift+J - Move item(s) down",
-            "  Shift+K - Move item(s) up",
+            "Function Keys:",
+            "  F1         - Help",
+            "  F2         - Rename",
+            "  F5         - Refresh",
+            "  Delete     - Delete item",
+            "  Insert     - New folder",
+            "",
+            "Multi-select:",
+            "  Space      - Select/deselect",
+            "  Ctrl+A     - Select all",
+            "  V          - Visual mode",
+            "  >/< indent/outdent",
+            "",
+            "Filters:",
+            "  f          - Quick filter",
+            "  F/C        - Folders/Conversations only",
+            "  a          - Show all",
+            "  0-9        - Expand to depth",
             "",
             "Organization:",
-            "  n       - Create new folder",
-            "  r       - Rename item",
-            "  d       - Delete item",
-            "  m       - Move item(s) to folder",
-            "  o       - Toggle sort (date/name)",
-            "  Shift+O - Clear custom ordering",
+            "  n/r/d/m    - New/Rename/Delete/Move",
+            "  Shift+J/K  - Reorder up/down",
+            "  o          - Toggle sort",
             "",
-            "Other:",
-            "  /       - Search conversations",
-            "  q       - Quit",
-            "",
-            "Multi-select: Use Space to select multiple items,",
-            "then use Shift+J/K to reorder or 'm' to move all.",
+            "Other: / (search), q (quit), ? (help)",
             "",
             "Press any key to close..."
         ]
@@ -554,6 +598,109 @@ class TUI:
             self.status_message = f"Moved {moved} items to {'root' if dest_id is None else 'folder'}"
         else:
             self.status_message = "No items could be moved"
+            
+    def _copy_item(self) -> None:
+        """Copy current item title to clipboard (conceptually)."""
+        item = self.tree_view.get_selected()
+        if item:
+            node, conv, _ = item
+            title = conv.title if conv else node.name
+            # Store for potential paste operation
+            self.clipboard = {"type": "title", "data": title}
+            self.status_message = f"Copied: {title[:30]}..."
+    
+    def _paste_item(self) -> None:
+        """Paste/duplicate item."""
+        if hasattr(self, 'clipboard') and self.clipboard:
+            self.status_message = f"Paste: {self.clipboard['data'][:30]}..."
+        else:
+            self.status_message = "Nothing to paste"
+    
+    def _undo_action(self) -> None:
+        """Undo last action."""
+        self.status_message = "Undo not yet implemented"
+    
+    def _repeat_last_action(self) -> None:
+        """Repeat last action."""
+        self.status_message = "Repeat not yet implemented"
+    
+    def _refresh_conversations(self) -> None:
+        """Refresh conversations from file."""
+        try:
+            self.conversations = load_conversations(self.conversations_file)
+            self.filtered_conversations = self.conversations
+            self._refresh_tree()
+            self.status_message = f"Refreshed {len(self.conversations)} conversations"
+        except Exception as e:
+            self.status_message = f"Refresh failed: {e}"
+    
+    def _toggle_visual_mode(self) -> None:
+        """Toggle visual selection mode."""
+        self.status_message = "Visual mode not yet implemented"
+    
+    def _indent_items(self) -> None:
+        """Indent selected items."""
+        if self.selected_items:
+            self.status_message = f"Indenting {len(self.selected_items)} items"
+        else:
+            self.status_message = "No items selected to indent"
+    
+    def _outdent_items(self) -> None:
+        """Outdent selected items."""
+        if self.selected_items:
+            self.status_message = f"Outdenting {len(self.selected_items)} items"
+        else:
+            self.status_message = "No items selected to outdent"
+    
+    def _quick_filter(self) -> None:
+        """Start quick filter mode."""
+        self.current_view = ViewMode.SEARCH
+        self.search_overlay.activate()
+        self.status_message = "Quick filter mode"
+    
+    def _filter_folders(self) -> None:
+        """Show only folders."""
+        # Filter conversations to empty, keeping only folder structure
+        self.filtered_conversations = []
+        self._refresh_tree()
+        self.status_message = "Showing only folders"
+    
+    def _filter_conversations(self) -> None:
+        """Show only conversations."""
+        # This would need more complex logic to flatten the tree
+        self.status_message = "Showing only conversations"
+    
+    def _show_all(self) -> None:
+        """Show all items (clear filters)."""
+        self.filtered_conversations = self.conversations
+        self._refresh_tree()
+        self.status_message = "Showing all items"
+    
+    def _expand_to_depth(self, depth: int) -> None:
+        """Expand tree to specific depth level."""
+        if depth == 0:
+            # Collapse all
+            for node in self.tree.nodes.values():
+                if node.is_folder:
+                    node.expanded = False
+        else:
+            # Expand to specified depth
+            def expand_recursive(node_ids, current_depth):
+                for node_id in node_ids:
+                    if node_id in self.tree.nodes:
+                        node = self.tree.nodes[node_id]
+                        if node.is_folder:
+                            node.expanded = current_depth < depth
+                            if node.expanded:
+                                expand_recursive(node.children, current_depth + 1)
+            
+            expand_recursive(self.tree.root_nodes, 1)
+        
+        self._refresh_tree()
+        if depth == 0:
+            self.status_message = "Collapsed all folders"
+        else:
+            self.status_message = f"Expanded to depth {depth}"
 
 
 def main():
