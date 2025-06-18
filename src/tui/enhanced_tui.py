@@ -403,7 +403,14 @@ class ChatGPTTUI:
         # Note: result can be None (root) or a folder ID
         # Both are valid destinations
         try:
-            self.organizer.tree_manager.move_node(node.id, result)
+            # Check if this is an unorganized conversation (not in tree yet)
+            if node.id not in self.organizer.tree_manager.organization_data.tree_nodes:
+                # Add it to the tree first
+                self.organizer.add_conversation(node.id, result)
+            else:
+                # It's already in the tree, just move it
+                self.organizer.tree_manager.move_node(node.id, result)
+            
             self.organizer.save_organization()
             self._refresh_tree()
             self.status_message = f"Moved to {'root' if result is None else 'folder'}"
