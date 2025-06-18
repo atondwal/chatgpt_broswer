@@ -27,11 +27,16 @@ class EnhancedTreeView:
         self.selected = 0
         self.offset = 0
         self.tree_items: List[Tuple[TreeNode, Optional[any], int]] = []
+        self.selected_items: set = set()  # Multi-selected items
         
     def set_items(self, items: List[Tuple[TreeNode, Optional[any], int]]) -> None:
         """Update tree items."""
         self.tree_items = items
         self.selected = min(self.selected, len(items) - 1) if items else 0
+        
+    def set_selected_items(self, selected_items: set) -> None:
+        """Update multi-selected items."""
+        self.selected_items = selected_items
         
     def handle_input(self, key: int) -> Optional[str]:
         """Handle keyboard input with vim-like bindings."""
@@ -151,6 +156,7 @@ class EnhancedTreeView:
         """Draw a single tree item with guide lines."""
         node, conv, depth = self.tree_items[idx]
         is_selected = idx == self.selected
+        is_multi_selected = node.id in self.selected_items
         
         # Build indent with guide lines
         indent_chars = []
@@ -172,6 +178,8 @@ class EnhancedTreeView:
             branch = ""
             
         # Icon and name
+        selection_marker = "✓ " if is_multi_selected else ""
+        
         if node.is_folder:
             icon = "▼" if node.expanded else "▶"
             folder_icon = "📁"
@@ -182,11 +190,13 @@ class EnhancedTreeView:
                 child_count = len(node.children)
                 name = f"{name} ({child_count})"
                 
-            display = f"{indent}{branch}{icon} {folder_icon} {name}"
+            display = f"{indent}{branch}{selection_marker}{icon} {folder_icon} {name}"
             
             # Color
             if is_selected:
                 attr = curses.color_pair(1)
+            elif is_multi_selected:
+                attr = curses.color_pair(3) | curses.A_REVERSE
             else:
                 attr = curses.color_pair(3) | curses.A_BOLD
         else:
@@ -198,20 +208,25 @@ class EnhancedTreeView:
                 from datetime import datetime
                 date_str = datetime.fromtimestamp(conv.create_time).strftime("%Y-%m-%d")
                 # Calculate space for date
-                base_display = f"{indent}{branch}{icon} {name}"
-                max_name_width = self.width - len(indent) - len(branch) - 4 - 12  # Reserve 12 chars for date
+                base_display = f"{indent}{branch}{selection_marker}{icon} {name}"
+                max_name_width = self.width - len(indent) - len(branch) - len(selection_marker) - 4 - 12  # Reserve 12 chars for date
                 if len(name) > max_name_width:
                     name = name[:max_name_width - 3] + "..."
-                display = f"{indent}{branch}{icon} {name}"
+                display = f"{indent}{branch}{selection_marker}{icon} {name}"
                 # Right-align date
                 padding = self.width - len(display) - 12
                 if padding > 0:
                     display += " " * padding + f"[{date_str}]"
             else:
-                display = f"{indent}{branch}{icon} {name}"
+                display = f"{indent}{branch}{selection_marker}{icon} {name}"
             
-            # Color - dim the date
-            attr = curses.color_pair(1) if is_selected else 0
+            # Color
+            if is_selected:
+                attr = curses.color_pair(1)
+            elif is_multi_selected:
+                attr = curses.A_REVERSE
+            else:
+                attr = 0
             
         # Truncate if needed
         max_width = self.width - 1

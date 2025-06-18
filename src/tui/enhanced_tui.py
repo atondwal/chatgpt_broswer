@@ -52,6 +52,10 @@ class ChatGPTTUI:
         self.search_term = ""
         self.filtered_conversations = self.conversations  # Conversations matching search
         
+        # Multi-select state
+        self.selected_items = set()  # Set of node IDs that are selected
+        self.multi_select_mode = False  # Whether we're in multi-select mode
+        
         
     def run(self, stdscr) -> None:
         """Main UI loop."""
@@ -111,8 +115,9 @@ class ChatGPTTUI:
             self.status_message = ""
         else:
             # Show help
+            multi_info = f" [{len(self.selected_items)} selected]" if self.selected_items else ""
             help_text = {
-                ViewMode.TREE: f"↑/↓:Navigate Enter:Open /:Search Shift+J/K:Reorder o:Sort({'Date' if self.sort_by_date else 'Name'}) ?:Help q:Quit",
+                ViewMode.TREE: f"↑/↓:Navigate Enter:Open Space:Select Ctrl+A:All /:Search Shift+J/K:Move{multi_info} ?:Help q:Quit",
                 ViewMode.SEARCH: "Type:Search ESC:Cancel Enter:Apply",
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
@@ -122,6 +127,7 @@ class ChatGPTTUI:
             
     def _draw_tree(self) -> None:
         """Draw tree view."""
+        self.tree_view.set_selected_items(self.selected_items)
         self.tree_view.draw()
             
     def _handle_key(self, key: int) -> None:
@@ -150,11 +156,21 @@ class ChatGPTTUI:
             return
             
         # Common navigation
-        if key == ord('q') or key == 27:  # q or ESC
+        if key == ord('q'):
             self.running = False
+        elif key == 27:  # ESC - clear selection if in multi-select mode, otherwise quit
+            if self.selected_items:
+                self.selected_items.clear()
+                self.status_message = "Selection cleared"
+            else:
+                self.running = False
         elif key == ord('/'):
             self.current_view = ViewMode.SEARCH
             self.search_overlay.activate()
+        elif key == 1:  # Ctrl+A
+            self._select_all()
+        elif key == ord(' '):  # Space for multi-select
+            self._toggle_item_selection()
             
         # Tree navigation (only view mode now)
         if self.current_view == ViewMode.TREE:
@@ -192,27 +208,33 @@ class ChatGPTTUI:
                     node.expanded = False
             self._refresh_tree()
         elif result == "move_up":
-            item = self.tree_view.get_selected()
-            if item:
-                node, _, _ = item
-                if self.tree.move_item_up(node.id):
-                    self.tree.save()
-                    self._refresh_tree()
-                    self._move_cursor_to_item(node.id)
-                    self.status_message = f"Moved '{node.name}' up"
-                else:
-                    self.status_message = "Cannot move up"
+            if self.selected_items:
+                self._bulk_move_up()
+            else:
+                item = self.tree_view.get_selected()
+                if item:
+                    node, _, _ = item
+                    if self.tree.move_item_up(node.id):
+                        self.tree.save()
+                        self._refresh_tree()
+                        self._move_cursor_to_item(node.id)
+                        self.status_message = f"Moved '{node.name}' up"
+                    else:
+                        self.status_message = "Cannot move up"
         elif result == "move_down":
-            item = self.tree_view.get_selected()
-            if item:
-                node, _, _ = item
-                if self.tree.move_item_down(node.id):
-                    self.tree.save()
-                    self._refresh_tree()
-                    self._move_cursor_to_item(node.id)
-                    self.status_message = f"Moved '{node.name}' down"
-                else:
-                    self.status_message = "Cannot move down"
+            if self.selected_items:
+                self._bulk_move_down()
+            else:
+                item = self.tree_view.get_selected()
+                if item:
+                    node, _, _ = item
+                    if self.tree.move_item_down(node.id):
+                        self.tree.save()
+                        self._refresh_tree()
+                        self._move_cursor_to_item(node.id)
+                        self.status_message = f"Moved '{node.name}' down"
+                    else:
+                        self.status_message = "Cannot move down"
         elif key == ord('n'):  # New folder
             self._create_folder()
         elif key == ord('r'):  # Rename
@@ -220,7 +242,10 @@ class ChatGPTTUI:
         elif key == ord('d'):  # Delete
             self._delete_item()
         elif key == ord('m'):  # Move
-            self._move_item()
+            if self.selected_items:
+                self._bulk_move_items()
+            else:
+                self._move_item()
         elif key == ord('?'):  # Help
             self._show_tree_help()
         elif key == ord('o'):  # Toggle sort order
@@ -332,24 +357,29 @@ class ChatGPTTUI:
             "",
             "Actions:",
             "  Enter   - Open conversation / Toggle folder",
-            "  Space   - Toggle folder expand/collapse",
+            "  Space   - Select/deselect item (multi-select)",
+            "  Ctrl+A  - Select all items",
+            "  ESC     - Clear selection (or quit if none)",
             "  *       - Expand all folders",
             "  -       - Collapse all folders",
             "",
             "Reordering:",
-            "  Shift+J - Move item down",
-            "  Shift+K - Move item up",
+            "  Shift+J - Move item(s) down",
+            "  Shift+K - Move item(s) up",
             "",
             "Organization:",
             "  n       - Create new folder",
             "  r       - Rename item",
             "  d       - Delete item",
-            "  m       - Move item",
+            "  m       - Move item(s) to folder",
             "  o       - Toggle sort (date/name)",
             "",
             "Other:",
             "  /       - Search conversations",
-            "  q/ESC   - Quit",
+            "  q       - Quit",
+            "",
+            "Multi-select: Use Space to select multiple items,",
+            "then use Shift+J/K to reorder or 'm' to move all.",
             "",
             "Press any key to close..."
         ]
@@ -420,6 +450,98 @@ class ChatGPTTUI:
         self.search_term = ""
         self.filtered_conversations = self.conversations
         self._refresh_tree()
+        
+    def _select_all(self) -> None:
+        """Select all visible items."""
+        for node, _, _ in self.tree_items:
+            self.selected_items.add(node.id)
+        self.status_message = f"Selected {len(self.selected_items)} items"
+        
+    def _toggle_item_selection(self) -> None:
+        """Toggle selection of current item."""
+        item = self.tree_view.get_selected()
+        if not item:
+            return
+            
+        node, _, _ = item
+        if node.id in self.selected_items:
+            self.selected_items.remove(node.id)
+            self.status_message = f"Deselected '{node.name}'"
+        else:
+            self.selected_items.add(node.id)
+            self.status_message = f"Selected '{node.name}'"
+            
+    def _bulk_move_up(self) -> None:
+        """Move all selected items up."""
+        if not self.selected_items:
+            return
+            
+        # Get items in tree order
+        selected_in_order = []
+        for node, _, _ in self.tree_items:
+            if node.id in self.selected_items:
+                selected_in_order.append(node.id)
+                
+        # Move from top to bottom to maintain relative order
+        moved = 0
+        for item_id in selected_in_order:
+            if self.tree.move_item_up(item_id):
+                moved += 1
+                
+        if moved > 0:
+            self.tree.save()
+            self._refresh_tree()
+            self.status_message = f"Moved {moved} items up"
+        else:
+            self.status_message = "Cannot move selected items up"
+            
+    def _bulk_move_down(self) -> None:
+        """Move all selected items down."""
+        if not self.selected_items:
+            return
+            
+        # Get items in reverse tree order
+        selected_in_order = []
+        for node, _, _ in reversed(self.tree_items):
+            if node.id in self.selected_items:
+                selected_in_order.append(node.id)
+                
+        # Move from bottom to top to maintain relative order
+        moved = 0
+        for item_id in selected_in_order:
+            if self.tree.move_item_down(item_id):
+                moved += 1
+                
+        if moved > 0:
+            self.tree.save()
+            self._refresh_tree()
+            self.status_message = f"Moved {moved} items down"
+        else:
+            self.status_message = "Cannot move selected items down"
+            
+    def _bulk_move_items(self) -> None:
+        """Move all selected items to a new parent."""
+        if not self.selected_items:
+            return
+            
+        dest_id = select_folder(self.stdscr, self.tree_items)
+        
+        moved = 0
+        for item_id in self.selected_items:
+            if item_id != dest_id:  # Can't move to itself
+                try:
+                    self.tree.move_node(item_id, dest_id)
+                    moved += 1
+                except Exception:
+                    pass  # Skip items that can't be moved
+                    
+        if moved > 0:
+            self.tree.save()
+            self._refresh_tree()
+            self.selected_items.clear()
+            self.status_message = f"Moved {moved} items to {'root' if dest_id is None else 'folder'}"
+        else:
+            self.status_message = "No items could be moved"
 
 
 def main():
