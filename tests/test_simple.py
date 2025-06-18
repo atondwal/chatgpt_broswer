@@ -1019,6 +1019,40 @@ class TestTUIEnhancements:
         assert result is not None
         assert result.message == "Created 'Empty Folder'"
     
+    def test_indent_outdent_single_item(self):
+        """Test that indent/outdent works on current item when nothing is selected."""
+        # Create a folder and some conversations
+        folder_id = self.tui.tree.create_folder("Target Folder")
+        conv1_id = "conv1"
+        conv2_id = "conv2"
+        self.tui.tree.add_conversation(conv1_id, "Conversation 1")
+        self.tui.tree.add_conversation(conv2_id, "Conversation 2")
+        self.tui._refresh_tree()
+        
+        # Clear selection to test single item behavior
+        self.tui.selected_items.clear()
+        
+        # Mock current item
+        mock_item = (self.tui.tree.nodes[conv1_id], Mock(title="Conversation 1"), 0)
+        self.tui.tree_view.get_selected = Mock(return_value=mock_item)
+        
+        # Test indent - should move current item into folder
+        from src.tui.action_handler import ActionContext
+        context = ActionContext(self.tui, ord('>'), "indent")
+        result = self.tui.operations_manager.handle("indent", context)
+        
+        assert result is not None
+        assert "Indented item into folder" in result.message
+        assert self.tui.tree.nodes[conv1_id].parent_id == folder_id
+        
+        # Test outdent - should move item back to root
+        context = ActionContext(self.tui, ord('<'), "outdent")
+        result = self.tui.operations_manager.handle("outdent", context)
+        
+        assert result is not None
+        assert "Outdented item" in result.message
+        assert self.tui.tree.nodes[conv1_id].parent_id is None
+    
     def teardown_method(self):
         """Clean up test files."""
         Path(self.test_file).unlink(missing_ok=True)

@@ -123,7 +123,11 @@ class OperationsManager(ActionHandler):
         Returns:
             Tuple of (status_message, original_positions_for_undo)
         """
-        if not selected_items:
+        # If no items selected, use current item
+        if not selected_items and current_item:
+            current_node, _, _ = current_item
+            selected_items = {current_node.id}
+        elif not selected_items:
             return "No items selected to indent", []
             
         # Find a suitable folder to move items into
@@ -163,17 +167,24 @@ class OperationsManager(ActionHandler):
                 pass
                 
         if moved > 0:
-            return f"Indented {moved} items into folder", original_positions
+            if moved == 1:
+                return f"Indented item into folder", original_positions
+            else:
+                return f"Indented {moved} items into folder", original_positions
         else:
             return "Could not indent items", []
             
-    def outdent_items(self, selected_items: Set[str]) -> Tuple[str, List[Tuple[str, str]]]:
+    def outdent_items(self, selected_items: Set[str], current_item: Optional[Tuple[Any, Any, int]] = None) -> Tuple[str, List[Tuple[str, str]]]:
         """Outdent selected items (move them to parent level).
         
         Returns:
             Tuple of (status_message, original_positions_for_undo)
         """
-        if not selected_items:
+        # If no items selected, use current item
+        if not selected_items and current_item:
+            current_node, _, _ = current_item
+            selected_items = {current_node.id}
+        elif not selected_items:
             return "No items selected to outdent", []
             
         # Save original positions for undo
@@ -196,7 +207,10 @@ class OperationsManager(ActionHandler):
                     pass
                     
         if moved > 0:
-            return f"Outdented {moved} items", original_positions
+            if moved == 1:
+                return f"Outdented item", original_positions
+            else:
+                return f"Outdented {moved} items", original_positions
         else:
             return "Could not outdent items (already at top level?)", []
             
@@ -346,7 +360,10 @@ class OperationsManager(ActionHandler):
             return ActionResult(False, message=message)
             
         elif action == "outdent":
-            message, original_positions = self.outdent_items(context.selected_items)
+            message, original_positions = self.outdent_items(
+                context.selected_items,
+                context.selected_item
+            )
             if original_positions and hasattr(context.tui, 'action_manager'):
                 context.tui.action_manager.save_undo_state("outdent", original_positions)
             if "Outdented" in message:
