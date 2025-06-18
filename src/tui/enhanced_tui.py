@@ -5,23 +5,19 @@ import argparse
 import curses
 import logging
 import sys
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
 
-from src.core.models import Conversation
 from src.core.simple_loader import load_conversations
-from src.tree.simple_tree import ConversationTree, TreeNode
-from src.tui.simple_search import SearchView
+from src.tree.simple_tree import ConversationTree
 from src.tui.simple_detail import DetailView
 from src.tui.simple_input import get_input, confirm, select_folder
 from src.tui.enhanced_tree_ux import EnhancedTreeView
+from src.tui.simple_search_overlay import SearchOverlay
 
 
 class ViewMode(Enum):
     """Available view modes."""
-    LIST = "list"
     TREE = "tree"
     DETAIL = "detail"
     SEARCH = "search"
@@ -42,14 +38,9 @@ class ChatGPTTUI:
         self.tree = ConversationTree(conversations_file)
         
         # UI state
-        self.current_view = ViewMode.LIST
+        self.current_view = ViewMode.TREE
         self.running = True
         self.status_message = ""
-        
-        # List view state
-        self.filtered_conversations = [(i, c) for i, c in enumerate(self.conversations)]
-        self.list_offset = 0
-        self.list_selected = 0
         
         # Tree view state
         self.tree_items = []  # List of (TreeNode, Optional[Conversation], depth)
@@ -59,6 +50,8 @@ class ChatGPTTUI:
         
         # Search state
         self.search_term = ""
+        self.filtered_conversations = self.conversations  # Conversations matching search
+        
         
     def run(self, stdscr) -> None:
         """Main UI loop."""
@@ -73,10 +66,9 @@ class ChatGPTTUI:
         
         # Initialize components
         height, width = stdscr.getmaxyx()
-        self.search_view = SearchView(stdscr, 0, 0, width, 1)
-        self.search_view.set_search_callback(self._on_search_changed)
         self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
         self.tree_view = EnhancedTreeView(stdscr, 1, 0, width, height - 2)
+        self.search_overlay = SearchOverlay(stdscr, 0, 0, width)
         
         # Initialize tree
         try:
@@ -103,15 +95,15 @@ class ChatGPTTUI:
         self.stdscr.clear()
         height, width = self.stdscr.getmaxyx()
         
-        if self.current_view == ViewMode.LIST:
-            self._draw_list()
-        elif self.current_view == ViewMode.TREE:
-            self._draw_tree()
-        elif self.current_view == ViewMode.DETAIL:
+        # Draw appropriate view
+        if self.current_view == ViewMode.DETAIL:
             self.detail_view.draw()
-        elif self.current_view == ViewMode.SEARCH:
-            self._draw_list()  # Background
-            self.search_view.draw()  # Overlay
+        else:
+            self._draw_tree()
+            
+        # Draw search overlay if active
+        if self.current_view == ViewMode.SEARCH:
+            self.search_overlay.draw()
             
         # Status line
         if self.status_message:
@@ -120,50 +112,13 @@ class ChatGPTTUI:
         else:
             # Show help
             help_text = {
-                ViewMode.LIST: "↑/↓:Navigate Enter:Select t:Tree /:Search q:Quit",
-                ViewMode.TREE: f"↑/↓:Navigate Enter:Open Shift+J/K:Reorder o:Sort({'Date' if self.sort_by_date else 'Name'}) ?:Help q:Quit",
-                ViewMode.SEARCH: "Type:Filter Enter:Apply ESC:Cancel",
+                ViewMode.TREE: f"↑/↓:Navigate Enter:Open /:Search Shift+J/K:Reorder o:Sort({'Date' if self.sort_by_date else 'Name'}) ?:Help q:Quit",
+                ViewMode.SEARCH: "Type:Search ESC:Cancel Enter:Apply",
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
             self.stdscr.addstr(height-1, 0, help_text[:width-1])
             
         self.stdscr.refresh()
-        
-    def _draw_list(self) -> None:
-        """Draw conversation list."""
-        height, width = self.stdscr.getmaxyx()
-        view_height = height - 2  # Leave room for title and status
-        
-        # Title
-        title = f"Conversations ({len(self.filtered_conversations)})"
-        if self.search_term:
-            title += f" - Filter: '{self.search_term}'"
-        self.stdscr.addstr(0, 0, title, curses.A_BOLD)
-        
-        # Adjust offset to keep selection visible
-        if self.list_selected < self.list_offset:
-            self.list_offset = self.list_selected
-        elif self.list_selected >= self.list_offset + view_height:
-            self.list_offset = self.list_selected - view_height + 1
-            
-        # Draw items
-        for i in range(view_height):
-            idx = self.list_offset + i
-            if idx >= len(self.filtered_conversations):
-                break
-                
-            _, conv = self.filtered_conversations[idx]
-            is_selected = idx == self.list_selected
-            
-            # Format line
-            timestamp = datetime.fromtimestamp(conv.create_time or 0).strftime("%Y-%m-%d %H:%M")
-            max_title_len = width - 20
-            title = conv.title[:max_title_len] + "..." if len(conv.title) > max_title_len else conv.title
-            line = f"{title:<{max_title_len}} {timestamp}"
-            
-            # Draw with selection
-            attr = curses.color_pair(1) if is_selected else 0
-            self.stdscr.addstr(i + 1, 0, line[:width-1], attr)
             
     def _draw_tree(self) -> None:
         """Draw tree view."""
@@ -171,20 +126,27 @@ class ChatGPTTUI:
             
     def _handle_key(self, key: int) -> None:
         """Handle keyboard input."""
-        # Mode-specific handling
+        
+        # Search mode handling
         if self.current_view == ViewMode.SEARCH:
-            result = self.search_view.handle_input(key)
+            result = self.search_overlay.handle_input(key)
             if result == "search_cancelled":
-                self.current_view = ViewMode.LIST
+                self.search_overlay.deactivate()
+                self.current_view = ViewMode.TREE
+                self._clear_search()
             elif result == "search_submitted":
-                self.current_view = ViewMode.LIST
-                self.status_message = f"Filter: '{self.search_view.get_search_term()}'"
+                self.search_overlay.deactivate()
+                self.current_view = ViewMode.TREE
+                if self.search_term:
+                    self.status_message = f"Search: '{self.search_term}' ({len(self.filtered_conversations)} matches)"
+            elif result == "search_changed":
+                self._update_search(self.search_overlay.get_search_term())
             return
             
         if self.current_view == ViewMode.DETAIL:
             result = self.detail_view.handle_input(key)
             if result == "close_detail":
-                self.current_view = ViewMode.LIST
+                self.current_view = ViewMode.TREE
             return
             
         # Common navigation
@@ -192,35 +154,11 @@ class ChatGPTTUI:
             self.running = False
         elif key == ord('/'):
             self.current_view = ViewMode.SEARCH
-            self.search_view.activate()
-        elif key == ord('t') and self.current_view == ViewMode.LIST:
-            self.current_view = ViewMode.TREE
-        elif key == ord('l') and self.current_view == ViewMode.TREE:
-            self.current_view = ViewMode.LIST
+            self.search_overlay.activate()
             
-        # List/Tree navigation
-        if self.current_view == ViewMode.LIST:
-            self._handle_list_key(key)
-        elif self.current_view == ViewMode.TREE:
+        # Tree navigation (only view mode now)
+        if self.current_view == ViewMode.TREE:
             self._handle_tree_key(key)
-            
-    def _handle_list_key(self, key: int) -> None:
-        """Handle keys in list view."""
-        if not self.filtered_conversations:
-            return
-            
-        if key == curses.KEY_UP:
-            self.list_selected = max(0, self.list_selected - 1)
-        elif key == curses.KEY_DOWN:
-            self.list_selected = min(len(self.filtered_conversations) - 1, self.list_selected + 1)
-        elif key == curses.KEY_PPAGE:  # Page Up
-            self.list_selected = max(0, self.list_selected - 10)
-        elif key == curses.KEY_NPAGE:  # Page Down
-            self.list_selected = min(len(self.filtered_conversations) - 1, self.list_selected + 10)
-        elif key in (10, 13, curses.KEY_ENTER):  # Enter
-            _, conv = self.filtered_conversations[self.list_selected]
-            self.detail_view.set_conversation(conv)
-            self.current_view = ViewMode.DETAIL
             
     def _handle_tree_key(self, key: int) -> None:
         """Handle keys in tree view."""
@@ -290,25 +228,13 @@ class ChatGPTTUI:
             
     def _refresh_tree(self) -> None:
         """Refresh tree items."""
-        self.tree_items = self.tree.get_tree_items(self.conversations, sort_by_date=self.sort_by_date)
+        self.tree_items = self.tree.get_tree_items(self.filtered_conversations, sort_by_date=self.sort_by_date)
         self.tree_view.set_items(self.tree_items)
         
         # Keep selection in bounds
         if self.tree_selected >= len(self.tree_items):
             self.tree_selected = max(0, len(self.tree_items) - 1)
             
-    def _on_search_changed(self, term: str) -> None:
-        """Handle search term changes."""
-        self.search_term = term.lower()
-        if not self.search_term:
-            self.filtered_conversations = [(i, c) for i, c in enumerate(self.conversations)]
-        else:
-            self.filtered_conversations = [
-                (i, c) for i, c in enumerate(self.conversations)
-                if self.search_term in c.title.lower()
-            ]
-        self.list_selected = 0
-        self.list_offset = 0
         
     def _create_folder(self) -> None:
         """Create new folder."""
@@ -422,9 +348,7 @@ class ChatGPTTUI:
             "  o       - Toggle sort (date/name)",
             "",
             "Other:",
-            "  /       - Search",
-            "  t       - Switch to tree view",
-            "  l       - Switch to list view",
+            "  /       - Search conversations",
             "  q/ESC   - Quit",
             "",
             "Press any key to close..."
@@ -464,6 +388,38 @@ class ChatGPTTUI:
                 self.tree_view.selected = i
                 self.tree_view._ensure_visible()
                 break
+                
+    def _update_search(self, term: str) -> None:
+        """Update search filtering."""
+        self.search_term = term.lower()
+        if not self.search_term:
+            self.filtered_conversations = self.conversations
+        else:
+            # Search in both title and content
+            self.filtered_conversations = []
+            for conv in self.conversations:
+                # Check title
+                if self.search_term in conv.title.lower():
+                    self.filtered_conversations.append(conv)
+                    continue
+                    
+                # Check message content
+                found_in_content = False
+                for message in conv.messages:
+                    if self.search_term in message.content.lower():
+                        found_in_content = True
+                        break
+                        
+                if found_in_content:
+                    self.filtered_conversations.append(conv)
+                    
+        self._refresh_tree()
+        
+    def _clear_search(self) -> None:
+        """Clear search filter."""
+        self.search_term = ""
+        self.filtered_conversations = self.conversations
+        self._refresh_tree()
 
 
 def main():

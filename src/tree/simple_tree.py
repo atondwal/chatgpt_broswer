@@ -220,6 +220,9 @@ class ConversationTree:
                 # Sort folders by name
                 folder_ids.sort(key=lambda id: self.nodes[id].name.lower())
                 
+                # Filter out conversations not in the filtered set
+                conv_ids = [id for id in conv_ids if id in conv_map]
+                
                 # Sort conversations by date (newest first) or name
                 if sort_by_date:
                     conv_ids.sort(key=lambda id: conv_map.get(id).create_time or 0, reverse=True)
@@ -238,7 +241,9 @@ class ConversationTree:
                         add_children(node.children, depth + 1, node_id)
                 else:
                     conv = conv_map.get(node_id)
-                    items.append((node, conv, depth))
+                    # Only show conversations that are in the filtered set
+                    if conv is not None:
+                        items.append((node, conv, depth))
         
         add_children(self.root_nodes, 0, None)
         return items
