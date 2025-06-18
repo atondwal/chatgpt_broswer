@@ -4,18 +4,60 @@
 
 This system follows a **modular layered architecture** with clear separation of concerns, implementing a **hierarchical conversation organization** system that evolved from a simple CLI tool into a sophisticated TUI application with modern Python patterns.
 
-## Directory Structure
+### 🎯 **Code as Self-Documentation**
+
+This codebase is designed around the principle that **well-structured code tells its own story**. Every module, class, and function name reveals its purpose immediately, creating a narrative that mirrors the problem domain:
+
+```python
+# The story unfolds naturally through imports:
+from src.core.models import Conversation, Message, MessageRole  # What IS a conversation?
+from src.core.extractors import MessageExtractor              # How do we parse complex data?
+from src.core.conversation_operations import ConversationLoader, ConversationSearcher  # What can we DO?
+from src.tree.conversation_tree import ConversationOrganizer  # How do we organize?
+from src.tui.enhanced_tui import EnhancedChatGPTTUI          # How do users interact?
+```
+
+The architecture itself documents the system - understanding the file structure immediately reveals how the application works.
+
+## Directory Structure: A Story in Folders
 
 ```
 src/
-├── core/           # Core conversation handling and data structures
-├── tree/           # Tree operations, types, and business logic  
-├── cli/            # Command-line interface modules
-└── tui/            # Terminal user interface components
+├── core/           # "What conversations ARE" - Domain models and operations
+│   ├── models.py                  # 📊 The vocabulary: Message, Conversation, MessageRole
+│   ├── extractors.py             # 🔍 How we parse ChatGPT's complex export format
+│   ├── conversation_operations.py # ⚡ What we DO: Load, Search, Export  
+│   └── chatgpt_browser.py        # 🔄 Legacy compatibility bridge
+├── tree/           # "How conversations are ORGANIZED" - Business logic
+│   ├── conversation_tree.py      # 🌳 The main organizer and tree manager
+│   ├── tree_operations.py        # 🛠️ Specialized tree manipulation operations
+│   ├── tree_types.py            # 📋 Type definitions that tell their own story
+│   ├── tree_constants.py        # ⚙️ Named constants that explain business rules
+│   └── tree_exceptions.py       # ❌ Error types that guide users
+├── cli/            # "How machines INTERACT" - Command-line interface
+│   ├── chatgpt_cli.py           # ⌨️ Modern CLI with clear command structure
+│   ├── cgpt.py                  # 🔄 Legacy CLI (preserved for compatibility)
+│   └── [6 other focused modules] # Each tells part of the CLI story
+└── tui/            # "How humans INTERACT" - Terminal user interface
+    ├── enhanced_tui.py          # 🎯 The main application orchestrator
+    ├── ui_base.py              # 🧱 Reusable building blocks
+    ├── search_view.py          # 🔍 Real-time search component
+    ├── detail_view.py          # 💬 Message viewing component
+    └── folder_management.py   # 📁 Interactive folder operations
 
-tests/              # Comprehensive test suite (117 tests)
-demos/              # Example usage and demonstrations
+tests/              # 🧪 Living documentation through 117 executable examples
+demos/              # 🎮 Example usage and demonstrations
 ```
+
+### 📖 **Reading the Architecture Story**
+
+1. **Start with `core/models.py`** → Learn the domain vocabulary
+2. **Read `core/extractors.py`** → Understand data transformation  
+3. **Explore `core/conversation_operations.py`** → See what operations are possible
+4. **Check `tree/conversation_tree.py`** → Learn organization concepts
+5. **Browse `tui/enhanced_tui.py`** → Experience user interaction
+
+The directory structure itself tells you the application's story: conversations are core entities that can be extracted, organized into trees, and accessed via CLI or TUI interfaces.
 
 ## Core Architecture Layers
 
@@ -112,6 +154,82 @@ src/cli/
 - Legacy compatibility maintained
 - Comprehensive search with content analysis
 - Multiple output formats and interactive modes
+
+## 🎨 **Code as Living Documentation**
+
+### Self-Explaining Function Names
+
+The code tells its story through intention-revealing names:
+
+```python
+# Instead of cryptic names like process() or handle():
+def extract_messages_from_mapping(mapping: Dict[str, Any]) -> List[Message]:
+def search_conversations_by_content(conversations: List[Conversation], term: str):
+def create_folder_with_validation(name: str, parent_id: Optional[str]):
+```
+
+### Type Hints as Contracts
+
+Every function signature documents its complete contract:
+
+```python
+def search_conversations(
+    self,
+    conversations: List[Conversation],    # What we search through
+    search_term: str,                     # What we're looking for
+    search_content: bool = False          # How deep to search
+) -> List[Tuple[Conversation, str]]:      # What we return: (conversation, context)
+```
+
+### Constants That Tell Business Stories
+
+```python
+# Magic numbers become named business rules:
+MAX_TREE_DEPTH = 20                      # Prevent deep nesting that hurts UI
+MAX_CHILDREN_PER_FOLDER = 1000           # Scalability limit for performance
+SCROLL_MARGIN = 3                        # Lines to keep visible when scrolling
+
+# Error messages guide users:
+ERROR_MESSAGES = {
+    "EMPTY_FOLDER_NAME": "Folder name cannot be empty",
+    "CYCLE_DETECTED": "Move would create a cycle",
+    "MAX_DEPTH_EXCEEDED": "Maximum tree depth ({max_depth}) exceeded"
+}
+```
+
+### Classes That Model the Domain
+
+```python
+@dataclass
+class Conversation:
+    """A ChatGPT conversation - exactly what you'd expect."""
+    id: str
+    title: str  
+    messages: List[Message]
+    create_time: Optional[float] = None
+    
+    @property
+    def has_messages(self) -> bool:
+        """Does this conversation contain any messages?"""
+        return bool(self.messages)
+    
+    @property  
+    def message_count(self) -> int:
+        """How many messages are in this conversation?"""
+        return len(self.messages)
+```
+
+### Tests as Executable Specifications
+
+```python
+def test_extract_messages_from_mapping_with_current_node():
+    """When current_node is specified, extract only that thread."""
+    # This test documents how conversation threading works
+    
+def test_search_conversations_by_content_finds_matches():
+    """Content search should find text within message bodies."""
+    # This test documents search behavior expectations
+```
 
 ## Key Architectural Patterns
 
