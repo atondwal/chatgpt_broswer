@@ -2,6 +2,7 @@
 """Enhanced tree view with excellent UX."""
 
 import curses
+from datetime import datetime
 from typing import List, Tuple, Optional
 from src.tree.simple_tree import TreeNode
 
@@ -205,7 +206,6 @@ class EnhancedTreeView:
             
             # Add date for conversations if enabled
             if self.show_dates and conv and conv.create_time:
-                from datetime import datetime
                 date_str = datetime.fromtimestamp(conv.create_time).strftime("%Y-%m-%d")
                 # Calculate space for date
                 base_display = f"{indent}{branch}{selection_marker}{icon} {name}"

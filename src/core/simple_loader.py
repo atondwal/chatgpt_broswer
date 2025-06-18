@@ -2,13 +2,11 @@
 """Simple conversation loader for ChatGPT exports."""
 
 import json
-from pathlib import Path
 from typing import List, Dict, Any
 from src.core.models import Conversation, Message, MessageRole
 
 
 def load_conversations(file_path: str) -> List[Conversation]:
-    """Load conversations from ChatGPT export file."""
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
@@ -159,22 +157,3 @@ def extract_content(msg_data: Dict[str, Any]) -> str:
     # Fallback
     return str(content) if content else "[Empty message]"
 
-
-def search_conversations(conversations: List[Conversation], query: str) -> List[Conversation]:
-    """Search conversations by title or content."""
-    query = query.lower()
-    results = []
-    
-    for conv in conversations:
-        # Check title
-        if query in conv.title.lower():
-            results.append(conv)
-            continue
-        
-        # Check messages
-        for msg in conv.messages:
-            if query in msg.content.lower():
-                results.append(conv)
-                break
-    
-    return results
