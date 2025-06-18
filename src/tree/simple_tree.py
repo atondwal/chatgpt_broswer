@@ -173,7 +173,7 @@ class ConversationTree:
                     self.root_nodes.discard(del_id)
                 del self.nodes[del_id]
     
-    def get_tree_items(self, conversations: List[any]) -> List[Tuple[TreeNode, Optional[any], int]]:
+    def get_tree_items(self, conversations: List[any], sort_by_date: bool = True) -> List[Tuple[TreeNode, Optional[any], int]]:
         """Get all items in tree order for display."""
         # Create lookup for conversations
         conv_map = {c.id: c for c in conversations}
@@ -190,9 +190,21 @@ class ConversationTree:
             # Filter out non-existent nodes
             valid_ids = [id for id in node_ids if id in self.nodes]
             
-            # Sort: folders first, then by name
-            sorted_ids = sorted(valid_ids, 
-                key=lambda id: (not self.nodes[id].is_folder, self.nodes[id].name.lower()))
+            # Separate folders and conversations
+            folder_ids = [id for id in valid_ids if self.nodes[id].is_folder]
+            conv_ids = [id for id in valid_ids if not self.nodes[id].is_folder]
+            
+            # Sort folders by name
+            folder_ids.sort(key=lambda id: self.nodes[id].name.lower())
+            
+            # Sort conversations by date (newest first) or name
+            if sort_by_date:
+                conv_ids.sort(key=lambda id: conv_map.get(id).create_time or 0, reverse=True)
+            else:
+                conv_ids.sort(key=lambda id: self.nodes[id].name.lower())
+            
+            # Combine: folders first, then conversations
+            sorted_ids = folder_ids + conv_ids
             
             for node_id in sorted_ids:
                     

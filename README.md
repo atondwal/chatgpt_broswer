@@ -1,14 +1,15 @@
 # ChatGPT History Browser
 
-A simple, fast tool for browsing and organizing your ChatGPT conversation history.
+A simple, fast tool for browsing and organizing your ChatGPT conversation history with excellent UX.
 
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Lines](https://img.shields.io/badge/lines-1367-brightgreen.svg)
+![Lines](https://img.shields.io/badge/lines-1500-brightgreen.svg)
 
 ## ✨ Features
 
 - **Interactive Terminal UI**: Browse conversations with a responsive interface
+- **Enhanced Tree View**: Visual hierarchy with guide lines and vim-like navigation
 - **Search**: Find conversations by title or content
 - **Folder Organization**: Create folders and organize conversations
 - **Conversation Viewer**: Read messages with proper formatting
@@ -60,17 +61,42 @@ cd chatgpt_browser
 - **Enter**: Apply
 - **ESC**: Cancel
 
-### Tree Organization
-- **n**: New folder
-- **r**: Rename
-- **d**: Delete
-- **m**: Move
-- **Space**: Toggle folder
+### Tree View (Enhanced!)
+- **Navigation**:
+  - **↑/↓** or **j/k**: Move through items
+  - **g/G**: Jump to top/bottom
+  - **h**: Jump to parent folder
+  - **l**: Expand folder or enter conversation
+- **Actions**:
+  - **Space**: Toggle folder expand/collapse
+  - **Enter**: Open conversation or toggle folder
+  - **\***: Expand all folders
+  - **-**: Collapse all folders
+- **Organization**:
+  - **n**: Create new folder
+  - **r**: Rename item
+  - **d**: Delete item
+  - **m**: Move item to another folder
+- **?**: Show help with all commands
 
 ### Reading Conversations
 - **↑/↓**: Scroll
 - **Page Up/Down**: Page scroll
 - **q**: Back to list
+
+## 🌳 Enhanced Tree View Features
+
+The tree view provides an excellent user experience with:
+
+- **Visual Hierarchy**: Tree guide lines (│, ├─, └─) show structure clearly
+- **Smart Icons**: 
+  - Folders show expand state (▶ collapsed, ▼ expanded)
+  - Child count displayed for each folder
+  - 💬 for conversations, 📁 for folders
+- **Vim-style Navigation**: Use h/j/k/l for efficient keyboard control
+- **Bulk Operations**: Expand/collapse all folders with * and -
+- **Contextual Help**: Press ? anytime to see available commands
+- **Full-width Selection**: Clear visual feedback for selected items
 
 ## 🏗️ Architecture: Self-Documenting Code
 
@@ -86,10 +112,11 @@ src/
 ├── tree/
 │   └── simple_tree.py      # Folder organization (205 lines)
 ├── tui/
-│   ├── enhanced_tui.py     # Main TUI app (399 lines)
+│   ├── enhanced_tui.py     # Main TUI app (450 lines)
+│   ├── enhanced_tree_ux.py # Tree view with excellent UX (230 lines)
 │   ├── simple_detail.py    # Conversation viewer (119 lines)
 │   ├── simple_search.py    # Search interface (109 lines)
-│   └── simple_input.py     # Input dialogs (158 lines)
+│   └── simple_input.py     # Input dialogs (161 lines)
 └── cli/
     └── simple_cli.py       # Command line interface (126 lines)
 ```

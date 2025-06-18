@@ -16,6 +16,7 @@ from src.tree.simple_tree import ConversationTree, TreeNode
 from src.tui.simple_search import SearchView
 from src.tui.simple_detail import DetailView
 from src.tui.simple_input import get_input, confirm, select_folder
+from src.tui.enhanced_tree_ux import EnhancedTreeView
 
 
 class ViewMode(Enum):
@@ -54,6 +55,7 @@ class ChatGPTTUI:
         self.tree_items = []  # List of (TreeNode, Optional[Conversation], depth)
         self.tree_offset = 0
         self.tree_selected = 0
+        self.sort_by_date = True  # True for date, False for alphabetical
         
         # Search state
         self.search_term = ""
@@ -74,6 +76,7 @@ class ChatGPTTUI:
         self.search_view = SearchView(stdscr, 0, 0, width, 1)
         self.search_view.set_search_callback(self._on_search_changed)
         self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
+        self.tree_view = EnhancedTreeView(stdscr, 1, 0, width, height - 2)
         
         # Initialize tree
         try:
@@ -118,7 +121,7 @@ class ChatGPTTUI:
             # Show help
             help_text = {
                 ViewMode.LIST: "↑/↓:Navigate Enter:Select t:Tree /:Search q:Quit",
-                ViewMode.TREE: "↑/↓:Navigate Enter:Open n:New r:Rename d:Delete m:Move l:List q:Quit",
+                ViewMode.TREE: f"↑/↓:Navigate Enter:Open n:New o:Sort({'Date' if self.sort_by_date else 'Name'}) ?:Help l:List q:Quit",
                 ViewMode.SEARCH: "Type:Filter Enter:Apply ESC:Cancel",
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
@@ -164,42 +167,7 @@ class ChatGPTTUI:
             
     def _draw_tree(self) -> None:
         """Draw tree view."""
-        height, width = self.stdscr.getmaxyx()
-        view_height = height - 2
-        
-        # Title
-        folders = sum(1 for n, _, _ in self.tree_items if n.is_folder)
-        convs = sum(1 for n, _, _ in self.tree_items if not n.is_folder)
-        self.stdscr.addstr(0, 0, f"Tree - {folders} folders, {convs} conversations", curses.A_BOLD)
-        
-        # Adjust offset
-        if self.tree_selected < self.tree_offset:
-            self.tree_offset = self.tree_selected
-        elif self.tree_selected >= self.tree_offset + view_height:
-            self.tree_offset = self.tree_selected - view_height + 1
-            
-        # Draw items
-        for i in range(view_height):
-            idx = self.tree_offset + i
-            if idx >= len(self.tree_items):
-                break
-                
-            node, conv, depth = self.tree_items[idx]
-            is_selected = idx == self.tree_selected
-            
-            # Build line
-            indent = "  " * depth
-            if node.is_folder:
-                icon = "▼ 📁" if node.expanded else "▶ 📁"
-                name = node.name
-                attr = curses.color_pair(3) if not is_selected else curses.color_pair(1)
-            else:
-                icon = "💬"
-                name = conv.title if conv else node.name
-                attr = curses.color_pair(1) if is_selected else 0
-                
-            line = f"{indent}{icon} {name}"[:width-1]
-            self.stdscr.addstr(i + 1, 0, line, attr)
+        self.tree_view.draw()
             
     def _handle_key(self, key: int) -> None:
         """Handle keyboard input."""
@@ -256,21 +224,35 @@ class ChatGPTTUI:
             
     def _handle_tree_key(self, key: int) -> None:
         """Handle keys in tree view."""
-        if not self.tree_items:
-            return
-            
-        if key == curses.KEY_UP:
-            self.tree_selected = max(0, self.tree_selected - 1)
-        elif key == curses.KEY_DOWN:
-            self.tree_selected = min(len(self.tree_items) - 1, self.tree_selected + 1)
-        elif key in (10, 13, curses.KEY_ENTER, ord(' ')):  # Enter or Space
-            node, conv, _ = self.tree_items[self.tree_selected]
-            if node.is_folder:
-                self.tree.toggle_folder(node.id)
-                self._refresh_tree()
-            elif conv:
-                self.detail_view.set_conversation(conv)
-                self.current_view = ViewMode.DETAIL
+        result = self.tree_view.handle_input(key)
+        
+        if result == "select":
+            item = self.tree_view.get_selected()
+            if item:
+                node, conv, _ = item
+                if node.is_folder:
+                    self.tree.toggle_folder(node.id)
+                    self._refresh_tree()
+                elif conv:
+                    self.detail_view.set_conversation(conv)
+                    self.current_view = ViewMode.DETAIL
+        elif result == "toggle":
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                if node.is_folder:
+                    self.tree.toggle_folder(node.id)
+                    self._refresh_tree()
+        elif result == "expand_all":
+            for node in self.tree.nodes.values():
+                if node.is_folder:
+                    node.expanded = True
+            self._refresh_tree()
+        elif result == "collapse_all":
+            for node in self.tree.nodes.values():
+                if node.is_folder:
+                    node.expanded = False
+            self._refresh_tree()
         elif key == ord('n'):  # New folder
             self._create_folder()
         elif key == ord('r'):  # Rename
@@ -279,10 +261,15 @@ class ChatGPTTUI:
             self._delete_item()
         elif key == ord('m'):  # Move
             self._move_item()
+        elif key == ord('?'):  # Help
+            self._show_tree_help()
+        elif key == ord('o'):  # Toggle sort order
+            self._toggle_sort_order()
             
     def _refresh_tree(self) -> None:
         """Refresh tree items."""
-        self.tree_items = self.tree.get_tree_items(self.conversations)
+        self.tree_items = self.tree.get_tree_items(self.conversations, sort_by_date=self.sort_by_date)
+        self.tree_view.set_items(self.tree_items)
         
         # Keep selection in bounds
         if self.tree_selected >= len(self.tree_items):
@@ -309,8 +296,9 @@ class ChatGPTTUI:
             
         try:
             parent_id = None
-            if self.tree_selected < len(self.tree_items):
-                node, _, _ = self.tree_items[self.tree_selected]
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
                 if node.is_folder:
                     parent_id = node.id
                     
@@ -323,10 +311,11 @@ class ChatGPTTUI:
             
     def _rename_item(self) -> None:
         """Rename selected item."""
-        if self.tree_selected >= len(self.tree_items):
+        item = self.tree_view.get_selected()
+        if not item:
             return
             
-        node, _, _ = self.tree_items[self.tree_selected]
+        node, _, _ = item
         new_name = get_input(self.stdscr, f"Rename '{node.name}':", node.name)
         if not new_name or new_name == node.name:
             return
@@ -341,10 +330,11 @@ class ChatGPTTUI:
             
     def _delete_item(self) -> None:
         """Delete selected item."""
-        if self.tree_selected >= len(self.tree_items):
+        item = self.tree_view.get_selected()
+        if not item:
             return
             
-        node, _, _ = self.tree_items[self.tree_selected]
+        node, _, _ = item
         item_type = "folder" if node.is_folder else "conversation"
         
         if not confirm(self.stdscr, f"Delete {item_type} '{node.name}'?"):
@@ -360,10 +350,11 @@ class ChatGPTTUI:
             
     def _move_item(self) -> None:
         """Move selected item."""
-        if self.tree_selected >= len(self.tree_items):
+        item = self.tree_view.get_selected()
+        if not item:
             return
             
-        node, _, _ = self.tree_items[self.tree_selected]
+        node, _, _ = item
         dest_id = select_folder(self.stdscr, self.tree_items)
         
         if dest_id == node.id:
@@ -377,6 +368,68 @@ class ChatGPTTUI:
             self.status_message = f"Moved to {'root' if dest_id is None else 'folder'}"
         except Exception as e:
             self.status_message = f"Error: {e}"
+            
+    def _show_tree_help(self) -> None:
+        """Show help dialog for tree view."""
+        help_text = [
+            "Tree View Controls:",
+            "",
+            "Navigation:",
+            "  ↑/k     - Move up",
+            "  ↓/j     - Move down",
+            "  g       - Go to top",
+            "  G       - Go to bottom",
+            "  h       - Jump to parent folder",
+            "  l       - Expand folder / Enter conversation",
+            "",
+            "Actions:",
+            "  Enter   - Open conversation / Toggle folder",
+            "  Space   - Toggle folder expand/collapse",
+            "  *       - Expand all folders",
+            "  -       - Collapse all folders",
+            "",
+            "Organization:",
+            "  n       - Create new folder",
+            "  r       - Rename item",
+            "  d       - Delete item",
+            "  m       - Move item",
+            "  o       - Toggle sort (date/name)",
+            "",
+            "Other:",
+            "  /       - Search",
+            "  t       - Switch to tree view",
+            "  l       - Switch to list view",
+            "  q/ESC   - Quit",
+            "",
+            "Press any key to close..."
+        ]
+        
+        # Calculate dialog size
+        height = len(help_text) + 2
+        width = max(len(line) for line in help_text) + 4
+        
+        # Center dialog
+        screen_height, screen_width = self.stdscr.getmaxyx()
+        y = (screen_height - height) // 2
+        x = (screen_width - width) // 2
+        
+        # Create window
+        win = curses.newwin(height, width, y, x)
+        win.keypad(True)
+        win.border()
+        
+        # Show help text
+        for i, line in enumerate(help_text):
+            win.addstr(i + 1, 2, line)
+            
+        win.refresh()
+        win.getch()  # Wait for any key
+        
+    def _toggle_sort_order(self) -> None:
+        """Toggle between date and alphabetical sorting."""
+        self.sort_by_date = not self.sort_by_date
+        self._refresh_tree()
+        self.status_message = f"Sorting by {'date (newest first)' if self.sort_by_date else 'name (A-Z)'}"
 
 
 def main():
