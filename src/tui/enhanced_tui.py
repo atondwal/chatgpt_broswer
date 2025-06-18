@@ -17,10 +17,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 
 # Local imports
-from src.core.chatgpt_browser import (
-    Conversation, ConversationLoader, ConversationSearcher, 
-    ConversationExporter, MessageRole
-)
+from src.core.models import Conversation, MessageRole
+from src.core.conversation_operations import ConversationLoader, ConversationSearcher, ConversationExporter
 from src.tree.conversation_tree import (
     ConversationOrganizer, TreeNode, NodeType, ConversationMetadata
 )
