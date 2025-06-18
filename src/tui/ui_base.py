@@ -60,18 +60,20 @@ class ScrollState:
 class BaseView(ABC):
     """Base class for all TUI views."""
     
-    def __init__(self, stdscr, start_y: int = 0, height: int = 0):
+    def __init__(self, stdscr, y: int = 0, x: int = 0, width: int = 0, height: int = 0):
         self.stdscr = stdscr
-        self.start_y = start_y
+        self.y = y
+        self.x = x
+        self.start_y = y  # For backwards compatibility
         
         # Handle curses attributes safely for testing
         try:
-            self.height = height or (curses.LINES - start_y - UI_CONSTANTS['STATUS_BAR_HEIGHT'])
-            self.width = curses.COLS
+            self.height = height or (curses.LINES - y - UI_CONSTANTS['STATUS_BAR_HEIGHT'])
+            self.width = width or curses.COLS
         except (AttributeError, TypeError):
             # Fallback for testing environments
             self.height = height or 24
-            self.width = 80
+            self.width = width or 80
             
         self.scroll_state = ScrollState()
     
@@ -85,11 +87,16 @@ class BaseView(ABC):
         """Handle input and return command if any."""
         pass
     
-    def clear_area(self, start_row: int, num_rows: int) -> None:
+    def clear_area(self, start_row: Optional[int] = None, num_rows: Optional[int] = None) -> None:
         """Clear a specific area of the view."""
+        if start_row is None:
+            start_row = self.y
+        if num_rows is None:
+            num_rows = self.height
+            
         for i in range(num_rows):
             try:
-                self.stdscr.move(start_row + i, 0)
+                self.stdscr.move(start_row + i, self.x)
                 self.stdscr.clrtoeol()
             except curses.error:
                 break
@@ -98,15 +105,15 @@ class BaseView(ABC):
         """Draw border around the view."""
         try:
             # Top border
-            self.stdscr.hline(self.start_y, 0, curses.ACS_HLINE, self.width)
+            self.stdscr.hline(self.y, self.x, curses.ACS_HLINE, self.width)
             if title:
                 title_text = f" {title} "
-                title_x = max(2, (self.width - len(title_text)) // 2)
-                self.stdscr.addstr(self.start_y, title_x, title_text)
+                title_x = max(self.x + 2, self.x + (self.width - len(title_text)) // 2)
+                self.stdscr.addstr(self.y, title_x, title_text)
             
             # Bottom border  
-            bottom_y = self.start_y + self.height - 1
-            self.stdscr.hline(bottom_y, 0, curses.ACS_HLINE, self.width)
+            bottom_y = self.y + self.height - 1
+            self.stdscr.hline(bottom_y, self.x, curses.ACS_HLINE, self.width)
             
         except curses.error:
             pass
@@ -137,13 +144,13 @@ class BaseView(ABC):
             
             # Clear the right column first
             for i in range(visible_height):
-                self.safe_addstr(self.start_y + 1 + i, self.width - 1, " ")
+                self.safe_addstr(self.y + 1 + i, self.x + self.width - 1, " ")
             
             # Draw the scroll indicator
             for i in range(indicator_height):
-                indicator_y = self.start_y + 1 + indicator_start + i
-                if indicator_y < self.start_y + 1 + visible_height:
-                    self.safe_addstr(indicator_y, self.width - 1, "█")
+                indicator_y = self.y + 1 + indicator_start + i
+                if indicator_y < self.y + 1 + visible_height:
+                    self.safe_addstr(indicator_y, self.x + self.width - 1, "█")
                     
         except curses.error:
             pass
@@ -152,8 +159,8 @@ class BaseView(ABC):
 class NavigableListView(BaseView):
     """Base class for views with navigable lists."""
     
-    def __init__(self, stdscr, start_y: int = 0, height: int = 0):
-        super().__init__(stdscr, start_y, height)
+    def __init__(self, stdscr, y: int = 0, x: int = 0, width: int = 0, height: int = 0):
+        super().__init__(stdscr, y, x, width, height)
         self.items: List[Any] = []
     
     @abstractmethod
@@ -172,21 +179,21 @@ class NavigableListView(BaseView):
     
     def draw_items(self, title: str = "") -> None:
         """Draw the list of items."""
-        self.clear_area(self.start_y, self.height)
+        self.clear_area()
         
         if title:
             self.draw_border(title)
         
         if not self.items:
             self.safe_addstr(
-                self.start_y + 2, 2, 
+                self.y + 2, self.x + 2, 
                 "No items to display",
                 curses.A_DIM
             )
             return
         
         start_idx, end_idx = self.get_visible_range()
-        display_y = self.start_y + UI_CONSTANTS['HEADER_HEIGHT']
+        display_y = self.y + UI_CONSTANTS['HEADER_HEIGHT']
         
         for i in range(start_idx, end_idx):
             is_selected = (i == self.scroll_state.selected)
@@ -196,7 +203,7 @@ class NavigableListView(BaseView):
             attr = curses.A_REVERSE if is_selected else 0
             
             self.safe_addstr(
-                display_y, 2, item_text, 
+                display_y, self.x + 2, item_text, 
                 attr, self.width - 4
             )
             display_y += 1

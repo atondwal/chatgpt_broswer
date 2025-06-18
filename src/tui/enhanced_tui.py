@@ -32,6 +32,8 @@ from src.tui.folder_management import (
     get_folder_name_input, confirm_delete, show_error_message, show_success_message,
     FolderManager
 )
+from src.tui.search_view import SearchView
+from src.tui.detail_view import ConversationDetailView
 
 
 class ViewMode(Enum):
@@ -125,7 +127,7 @@ class EnhancedConversationListView(NavigableListView):
     """Enhanced conversation list view with improved navigation and search."""
     
     def __init__(self, stdscr, dimensions: WindowDimensions):
-        super().__init__(stdscr, dimensions.start_y, dimensions.height)
+        super().__init__(stdscr, dimensions.start_y, dimensions.start_x, dimensions.width, dimensions.height)
         self.dims = dimensions
         self.conversations: List[Conversation] = []
         self.filtered_conversations: List[Tuple[int, Conversation]] = []
@@ -218,7 +220,7 @@ class EnhancedTreeListView(NavigableListView):
     """Enhanced tree view with folder management capabilities."""
     
     def __init__(self, stdscr, dimensions: WindowDimensions, organizer: ConversationOrganizer):
-        super().__init__(stdscr, dimensions.start_y, dimensions.height)
+        super().__init__(stdscr, dimensions.start_y, dimensions.start_x, dimensions.width, dimensions.height)
         self.dims = dimensions
         self.organizer = organizer
         self.tree_items: List[Tuple[TreeNode, Optional[Conversation], int]] = []  # (node, conversation, depth)
@@ -381,6 +383,9 @@ class EnhancedChatGPTTUI:
         self.status_bar = None
         self.list_view = None
         self.tree_view = None
+        self.search_view = None
+        self.detail_view = None
+        self.current_conversation = None
         
     def _setup_logging(self) -> logging.Logger:
         """Set up logging configuration."""
@@ -445,9 +450,22 @@ class EnhancedChatGPTTUI:
         self.tree_view = EnhancedTreeListView(self.stdscr, content_dims, self.organizer)
         self.tree_view.set_conversations(self.conversations)
         
+        # Initialize search view (positioned at top)
+        self.search_view = SearchView(self.stdscr, 0, 0, width, 1)
+        self.search_view.set_search_callback(self._on_search_changed)
+        
+        # Initialize detail view (full content area)
+        self.detail_view = ConversationDetailView(self.stdscr, 1, 0, width, content_height - 1)
+        
     def _handle_input(self, key: int) -> None:
         """Handle user input."""
-        if self.current_view == ViewMode.CONVERSATION_LIST:
+        if self.current_view == ViewMode.SEARCH:
+            result = self.search_view.handle_input(key)
+            self._process_command(result)
+        elif self.current_view == ViewMode.CONVERSATION_DETAIL:
+            result = self.detail_view.handle_input(key)
+            self._process_command(result)
+        elif self.current_view == ViewMode.CONVERSATION_LIST:
             result = self.list_view.handle_input(key)
             self._process_command(result)
         elif self.current_view == ViewMode.CONVERSATION_TREE:
@@ -462,6 +480,16 @@ class EnhancedChatGPTTUI:
         try:
             if command == "quit":
                 self.running = False
+            elif command == "start_search":
+                self._start_search()
+            elif command == "search_cancelled":
+                self._cancel_search()
+            elif command == "search_submitted":
+                self._submit_search()
+            elif command == "select_conversation":
+                self._select_conversation()
+            elif command == "close_detail":
+                self._close_detail()
             elif command == "toggle_tree_view":
                 self.current_view = ViewMode.CONVERSATION_TREE
                 self.status_message = "Switched to tree view"
@@ -627,6 +655,55 @@ class EnhancedChatGPTTUI:
             
         except Exception as e:
             show_error_message(self.stdscr, f"Failed to move: {str(e)}")
+    
+    def _start_search(self) -> None:
+        """Start search mode."""
+        self.current_view = ViewMode.SEARCH
+        self.search_view.activate()
+        self.status_message = "Search mode - type to filter conversations"
+    
+    def _cancel_search(self) -> None:
+        """Cancel search and return to previous view."""
+        self.search_view.deactivate()
+        self.current_view = ViewMode.CONVERSATION_LIST
+        self.status_message = "Search cancelled"
+    
+    def _submit_search(self) -> None:
+        """Submit search and return to list view with filtered results."""
+        search_term = self.search_view.get_search_term()
+        self.search_view.deactivate()
+        self.current_view = ViewMode.CONVERSATION_LIST
+        if search_term:
+            self.status_message = f"Showing results for: '{search_term}'"
+        else:
+            self.status_message = "Showing all conversations"
+    
+    def _on_search_changed(self, search_term: str) -> None:
+        """Handle search term changes."""
+        if self.list_view:
+            self.list_view.filter_conversations(search_term)
+    
+    def _select_conversation(self) -> None:
+        """Select and view a conversation in detail."""
+        if self.current_view == ViewMode.CONVERSATION_LIST:
+            conversation = self.list_view.get_selected_conversation()
+        elif self.current_view == ViewMode.CONVERSATION_TREE:
+            conversation = self.tree_view.get_selected_conversation()
+        else:
+            return
+            
+        if conversation:
+            self.current_conversation = conversation
+            self.detail_view.set_conversation(conversation)
+            self.current_view = ViewMode.CONVERSATION_DETAIL
+            self.status_message = f"Viewing: {conversation.title}"
+    
+    def _close_detail(self) -> None:
+        """Close detail view and return to previous view."""
+        self.detail_view.clear_conversation()
+        self.current_conversation = None
+        self.current_view = ViewMode.CONVERSATION_LIST
+        self.status_message = "Returned to conversation list"
             
     def _show_help(self) -> None:
         """Show help shortcuts."""
@@ -638,7 +715,7 @@ class EnhancedChatGPTTUI:
                 "/": "Search",
                 "q": "Quit"
             }
-        else:  # Tree view
+        elif self.current_view == ViewMode.CONVERSATION_TREE:
             shortcuts = {
                 "↑/↓": "Navigate",
                 "Enter": "Open/Toggle",
@@ -650,6 +727,22 @@ class EnhancedChatGPTTUI:
                 "l": "List view",
                 "q": "Quit"
             }
+        elif self.current_view == ViewMode.SEARCH:
+            shortcuts = {
+                "Type": "Filter",
+                "Enter": "Apply filter",
+                "ESC": "Cancel",
+            }
+        elif self.current_view == ViewMode.CONVERSATION_DETAIL:
+            shortcuts = {
+                "↑/↓": "Scroll",
+                "PgUp/PgDn": "Page scroll",
+                "Home/End": "Top/Bottom",
+                "q/ESC": "Back to list"
+            }
+        else:
+            shortcuts = {"?": "Help", "q": "Quit"}
+            
         self.status_bar.show_shortcuts(shortcuts)
         
     def _draw_screen(self) -> None:
@@ -660,6 +753,13 @@ class EnhancedChatGPTTUI:
             self.list_view.draw()
         elif self.current_view == ViewMode.CONVERSATION_TREE:
             self.tree_view.draw()
+        elif self.current_view == ViewMode.SEARCH:
+            # Draw the current list view in the background
+            self.list_view.draw()
+            # Draw search overlay on top
+            self.search_view.draw()
+        elif self.current_view == ViewMode.CONVERSATION_DETAIL:
+            self.detail_view.draw()
             
         # Update status bar
         if self.status_message:
