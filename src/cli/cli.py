@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from src.core.simple_loader import load_conversations
+from src.core.loader import load_conversations
 
 
 def list_conversations(file_path: str, count: int = 20) -> None:

@@ -4,10 +4,10 @@
 import curses
 from datetime import datetime
 from typing import List, Tuple, Optional
-from src.tree.simple_tree import TreeNode
+from src.tree.tree import TreeNode
 
 
-class SimpleTreeView:
+class TreeView:
     """Tree view with excellent visual hierarchy and interactions."""
     
     def __init__(self, stdscr, y: int, x: int, width: int, height: int):
