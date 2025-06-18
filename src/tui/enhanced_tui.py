@@ -260,6 +260,7 @@ class ChatGPTTUI:
                 if self.tree.move_item_up(node.id):
                     self.tree.save()
                     self._refresh_tree()
+                    self._move_cursor_to_item(node.id)
                     self.status_message = f"Moved '{node.name}' up"
                 else:
                     self.status_message = "Cannot move up"
@@ -270,6 +271,7 @@ class ChatGPTTUI:
                 if self.tree.move_item_down(node.id):
                     self.tree.save()
                     self._refresh_tree()
+                    self._move_cursor_to_item(node.id)
                     self.status_message = f"Moved '{node.name}' down"
                 else:
                     self.status_message = "Cannot move down"
@@ -454,6 +456,14 @@ class ChatGPTTUI:
         self.sort_by_date = not self.sort_by_date
         self._refresh_tree()
         self.status_message = f"Sorting by {'date (newest first)' if self.sort_by_date else 'name (A-Z)'}"
+        
+    def _move_cursor_to_item(self, item_id: str) -> None:
+        """Move cursor to the specified item in the tree."""
+        for i, (node, _, _) in enumerate(self.tree_items):
+            if node.id == item_id:
+                self.tree_view.selected = i
+                self.tree_view._ensure_visible()
+                break
 
 
 def main():
