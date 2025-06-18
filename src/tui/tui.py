@@ -394,10 +394,30 @@ class TUI:
                 if node.is_folder:
                     parent_id = node.id
                     
-            self.tree.create_folder(name, parent_id)
+            folder_id = self.tree.create_folder(name, parent_id)
+            
+            # If we have selected items, move them into the new folder
+            if self.selected_items:
+                moved_items = []
+                for item_id in self.selected_items.copy():  # Copy to avoid modification during iteration
+                    try:
+                        self.tree.move_node(item_id, folder_id)
+                        moved_items.append(self.tree.nodes[item_id].name)
+                    except Exception:
+                        pass  # Skip items that can't be moved
+                
+                self.selected_items.clear()  # Clear selection after moving
+                
+                if moved_items:
+                    self.status_message = f"Created '{name}' and moved {len(moved_items)} items into it"
+                else:
+                    self.status_message = f"Created '{name}' (no items could be moved)"
+            else:
+                self.status_message = f"Created '{name}'"
+                
             self.tree.save()
             self._refresh_tree()
-            self.status_message = f"Created '{name}'"
+            
         except Exception as e:
             self.status_message = f"Error: {e}"
             

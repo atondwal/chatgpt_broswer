@@ -851,6 +851,65 @@ class TestTUIEnhancements:
         # Conversations should still be unfiltered
         assert len(self.tui.filtered_conversations) == original_conv_count
     
+    def test_create_folder_with_selected_items(self):
+        """Test that creating a folder with selected items moves them into the folder."""
+        # Create test conversations
+        conv_id1 = "conv1"
+        conv_id2 = "conv2"
+        conv_id3 = "conv3"
+        self.tui.tree.add_conversation(conv_id1, "First Conversation")
+        self.tui.tree.add_conversation(conv_id2, "Second Conversation")
+        self.tui.tree.add_conversation(conv_id3, "Third Conversation")
+        self.tui._refresh_tree()
+        
+        # Select two items
+        self.tui.selected_items = {conv_id1, conv_id2}
+        original_parent1 = self.tui.tree.nodes[conv_id1].parent_id
+        original_parent2 = self.tui.tree.nodes[conv_id2].parent_id
+        
+        # Mock the input for folder name and stdscr
+        from unittest.mock import patch, Mock
+        self.tui.stdscr = Mock()  # Mock the stdscr attribute
+        with patch('src.tui.tui.get_input', return_value="Test Folder"):
+            # Create folder - should move selected items into it
+            self.tui._create_folder()
+        
+        # Check that folder was created
+        folder_nodes = [node for node in self.tui.tree.nodes.values() if node.is_folder and node.name == "Test Folder"]
+        assert len(folder_nodes) == 1
+        folder_id = folder_nodes[0].id
+        
+        # Check that selected items were moved into the folder
+        assert self.tui.tree.nodes[conv_id1].parent_id == folder_id
+        assert self.tui.tree.nodes[conv_id2].parent_id == folder_id
+        
+        # Check that the third item wasn't moved
+        assert self.tui.tree.nodes[conv_id3].parent_id != folder_id
+        
+        # Check that selection was cleared
+        assert len(self.tui.selected_items) == 0
+        
+        # Check status message
+        assert "moved 2 items into it" in self.tui.status_message
+    
+    def test_create_folder_without_selection(self):
+        """Test that creating a folder without selection works normally."""
+        self.tui.selected_items.clear()
+        
+        # Mock the input for folder name and stdscr
+        from unittest.mock import patch, Mock
+        self.tui.stdscr = Mock()  # Mock the stdscr attribute
+        with patch('src.tui.tui.get_input', return_value="Empty Folder"):
+            # Create folder without selection
+            self.tui._create_folder()
+        
+        # Check that folder was created
+        folder_nodes = [node for node in self.tui.tree.nodes.values() if node.is_folder and node.name == "Empty Folder"]
+        assert len(folder_nodes) == 1
+        
+        # Check normal status message
+        assert self.tui.status_message == "Created 'Empty Folder'"
+    
     def teardown_method(self):
         """Clean up test files."""
         Path(self.test_file).unlink(missing_ok=True)
