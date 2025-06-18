@@ -55,6 +55,12 @@ class TUI:
         # Multi-select state
         self.selected_items = set()  # Set of node IDs that are selected
         self.multi_select_mode = False  # Whether we're in multi-select mode
+        self.visual_mode = False  # Visual mode for range selection
+        self.visual_start = None  # Starting position for visual mode
+        
+        # Undo system
+        self.undo_stack = []  # Stack of (action, data) tuples
+        self.last_action = None  # Last action for repeat
         
         
     def run(self, stdscr) -> None:
@@ -116,8 +122,9 @@ class TUI:
         else:
             # Show help
             multi_info = f" [{len(self.selected_items)} selected]" if self.selected_items else ""
+            visual_info = " [VISUAL]" if self.visual_mode else ""
             help_text = {
-                ViewMode.TREE: f"gg/G:Top/Bot x:Delete f:Filter F1:Help{multi_info} Enhanced keys available!",
+                ViewMode.TREE: f"gg/G:Top/Bot x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}",
                 ViewMode.SEARCH: "Type:Search ESC:Cancel Enter:Apply", 
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
@@ -215,6 +222,7 @@ class TUI:
                 if item:
                     node, _, _ = item
                     if self.tree.move_item_up(node.id):
+                        self._save_last_action("move_up")
                         self.tree.save()
                         self._refresh_tree()
                         self._move_cursor_to_item(node.id)
@@ -229,31 +237,14 @@ class TUI:
                 if item:
                     node, _, _ = item
                     if self.tree.move_item_down(node.id):
+                        self._save_last_action("move_down")
                         self.tree.save()
                         self._refresh_tree()
                         self._move_cursor_to_item(node.id)
                         self.status_message = f"Moved '{node.name}' down"
                     else:
                         self.status_message = "Cannot move down"
-        elif key == ord('n'):  # New folder
-            self._create_folder()
-        elif key == ord('r'):  # Rename
-            self._rename_item()
-        elif key == ord('d'):  # Delete
-            self._delete_item()
-        elif key == ord('m'):  # Move
-            if self.selected_items:
-                self._bulk_move_items()
-            else:
-                self._move_item()
-        elif key == ord('?'):  # Help
-            self._show_tree_help()
-        elif key == ord('o'):  # Toggle sort order
-            self._toggle_sort_order()
-        elif key == ord('O'):  # Clear custom ordering (Shift+O)
-            self._clear_custom_order()
-        
-        # Handle new keybindings
+        # Handle enhanced keybindings from tree_view
         elif result == "delete":
             self._delete_item()
         elif result == "copy":
@@ -289,6 +280,24 @@ class TUI:
         elif result and result.startswith("expand_depth_"):
             depth = int(result.split("_")[-1])
             self._expand_to_depth(depth)
+        # Legacy explicit key handling (fallback for keys not handled by tree_view)
+        elif key == ord('n'):  # New folder
+            self._create_folder()
+        elif key == ord('r'):  # Rename
+            self._rename_item()
+        elif key == ord('d'):  # Delete
+            self._delete_item()
+        elif key == ord('m'):  # Move
+            if self.selected_items:
+                self._bulk_move_items()
+            else:
+                self._move_item()
+        elif key == ord('?'):  # Help
+            self._show_tree_help()
+        elif key == ord('o'):  # Toggle sort order
+            self._toggle_sort_order()
+        elif key == ord('O'):  # Clear custom ordering (Shift+O)
+            self._clear_custom_order()
             
     def _refresh_tree(self) -> None:
         """Refresh tree items."""
@@ -618,11 +627,75 @@ class TUI:
     
     def _undo_action(self) -> None:
         """Undo last action."""
-        self.status_message = "Undo not yet implemented"
+        if not self.undo_stack:
+            self.status_message = "Nothing to undo"
+            return
+            
+        action, data = self.undo_stack.pop()
+        
+        if action == "move":
+            # Undo move: move back to original position
+            node_id, original_parent = data
+            try:
+                self.tree.move_node(node_id, original_parent)
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Undid move operation"
+            except Exception as e:
+                self.status_message = f"Undo failed: {e}"
+        elif action == "delete":
+            # Undo delete: restore from data
+            self.status_message = "Delete undo not implemented yet"
+        elif action == "create":
+            # Undo create: delete the created item
+            node_id = data
+            if node_id in self.tree.nodes:
+                self.tree.delete_node(node_id)
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = "Undid create operation"
+        else:
+            self.status_message = f"Cannot undo action: {action}"
     
     def _repeat_last_action(self) -> None:
         """Repeat last action."""
-        self.status_message = "Repeat not yet implemented"
+        if not self.last_action:
+            self.status_message = "No action to repeat"
+            return
+            
+        action_type, action_data = self.last_action
+        
+        if action_type == "move_up":
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                if self.tree.move_item_up(node.id):
+                    self.tree.save()
+                    self._refresh_tree()
+                    self._move_cursor_to_item(node.id)
+                    self.status_message = f"Repeated: moved '{node.name}' up"
+        elif action_type == "move_down":
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                if self.tree.move_item_down(node.id):
+                    self.tree.save()
+                    self._refresh_tree()
+                    self._move_cursor_to_item(node.id)
+                    self.status_message = f"Repeated: moved '{node.name}' down"
+        else:
+            self.status_message = f"Cannot repeat action: {action_type}"
+    
+    def _save_undo_state(self, action: str, data: any) -> None:
+        """Save state for undo functionality."""
+        self.undo_stack.append((action, data))
+        # Limit undo stack size
+        if len(self.undo_stack) > 20:
+            self.undo_stack.pop(0)
+            
+    def _save_last_action(self, action_type: str, action_data: any = None) -> None:
+        """Save last action for repeat functionality."""
+        self.last_action = (action_type, action_data)
     
     def _refresh_conversations(self) -> None:
         """Refresh conversations from file."""
@@ -636,21 +709,91 @@ class TUI:
     
     def _toggle_visual_mode(self) -> None:
         """Toggle visual selection mode."""
-        self.status_message = "Visual mode not yet implemented"
+        if not self.visual_mode:
+            # Enter visual mode
+            self.visual_mode = True
+            self.visual_start = self.tree_view.selected
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                self.selected_items.add(node.id)
+            self.status_message = "Visual mode activated - use arrows to select range"
+        else:
+            # Exit visual mode
+            self.visual_mode = False
+            self.visual_start = None
+            self.status_message = f"Visual mode deactivated - {len(self.selected_items)} items selected"
     
     def _indent_items(self) -> None:
-        """Indent selected items."""
-        if self.selected_items:
-            self.status_message = f"Indenting {len(self.selected_items)} items"
-        else:
+        """Indent selected items (move them into a sibling folder)."""
+        if not self.selected_items:
             self.status_message = "No items selected to indent"
+            return
+            
+        # Find a suitable folder to move items into
+        current_item = self.tree_view.get_selected()
+        if not current_item:
+            self.status_message = "Cannot determine target for indentation"
+            return
+            
+        current_node, _, _ = current_item
+        
+        # Look for a folder at the same level to move items into
+        parent_id = current_node.parent_id
+        siblings = self.tree.nodes[parent_id].children if parent_id else self.tree.root_nodes
+        
+        # Find first folder sibling
+        target_folder = None
+        for sibling_id in siblings:
+            sibling = self.tree.nodes.get(sibling_id)
+            if sibling and sibling.is_folder and sibling_id not in self.selected_items:
+                target_folder = sibling_id
+                break
+                
+        if target_folder:
+            moved = 0
+            for item_id in self.selected_items:
+                try:
+                    self.tree.move_node(item_id, target_folder)
+                    moved += 1
+                except Exception:
+                    pass
+                    
+            if moved > 0:
+                self.tree.save()
+                self._refresh_tree()
+                self.selected_items.clear()
+                self.status_message = f"Indented {moved} items into folder"
+            else:
+                self.status_message = "Could not indent items"
+        else:
+            self.status_message = "No folder available for indentation"
     
     def _outdent_items(self) -> None:
-        """Outdent selected items."""
-        if self.selected_items:
-            self.status_message = f"Outdenting {len(self.selected_items)} items"
-        else:
+        """Outdent selected items (move them to parent level)."""
+        if not self.selected_items:
             self.status_message = "No items selected to outdent"
+            return
+            
+        moved = 0
+        for item_id in self.selected_items:
+            node = self.tree.nodes.get(item_id)
+            if node and node.parent_id:
+                # Move to the parent's parent
+                grandparent_id = self.tree.nodes[node.parent_id].parent_id if node.parent_id in self.tree.nodes else None
+                try:
+                    self.tree.move_node(item_id, grandparent_id)
+                    moved += 1
+                except Exception:
+                    pass
+                    
+        if moved > 0:
+            self.tree.save()
+            self._refresh_tree()
+            self.selected_items.clear()
+            self.status_message = f"Outdented {moved} items"
+        else:
+            self.status_message = "Could not outdent items (already at top level?)"
     
     def _quick_filter(self) -> None:
         """Start quick filter mode."""
