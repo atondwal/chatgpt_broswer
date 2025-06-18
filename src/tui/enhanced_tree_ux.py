@@ -206,17 +206,9 @@ class EnhancedTreeView:
             
             # Add date for conversations if enabled
             if self.show_dates and conv and conv.create_time:
-                date_str = datetime.fromtimestamp(conv.create_time).strftime("%Y-%m-%d")
-                # Calculate space for date
-                base_display = f"{indent}{branch}{selection_marker}{icon} {name}"
-                max_name_width = self.width - len(indent) - len(branch) - len(selection_marker) - 4 - 12  # Reserve 12 chars for date
-                if len(name) > max_name_width:
-                    name = name[:max_name_width - 3] + "..."
-                display = f"{indent}{branch}{selection_marker}{icon} {name}"
-                # Right-align date
-                padding = self.width - len(display) - 12
-                if padding > 0:
-                    display += " " * padding + f"[{date_str}]"
+                date_str = datetime.fromtimestamp(conv.create_time).strftime("%m/%d")
+                # Show date right after the title with minimal spacing
+                display = f"{indent}{branch}{selection_marker}{icon} {name} [{date_str}]"
             else:
                 display = f"{indent}{branch}{selection_marker}{icon} {name}"
             
