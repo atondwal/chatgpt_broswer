@@ -5,16 +5,14 @@ import argparse
 import curses
 import logging
 import sys
-import textwrap
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple
 
-from src.core.models import Conversation, MessageRole
-from src.core.conversation_operations import ConversationLoader, ConversationSearcher, ConversationExporter
-from src.tree.conversation_tree import ConversationOrganizer, TreeNode, NodeType, ConversationMetadata
-from src.tree.tree_constants import TREE_CHARS
+from src.core.models import Conversation
+from src.core.conversation_operations import ConversationLoader
+from src.tree.simple_tree import ConversationTree, TreeNode
 from src.tui.folder_management import get_folder_name_input, confirm_delete, FolderManager
 from src.tui.search_view import SearchView
 from src.tui.detail_view import ConversationDetailView
@@ -41,7 +39,7 @@ class ChatGPTTUI:
         # Load data
         self.loader = ConversationLoader()
         self.conversations = self.loader.load_conversations(conversations_file)
-        self.organizer = ConversationOrganizer(conversations_file, debug=debug)
+        self.tree = ConversationTree(conversations_file)
         
         # UI state
         self.current_view = ViewMode.LIST
@@ -166,8 +164,8 @@ class ChatGPTTUI:
         view_height = height - 2
         
         # Title
-        folders = sum(1 for n, _, _ in self.tree_items if n.node_type == NodeType.FOLDER)
-        convs = sum(1 for n, _, _ in self.tree_items if n.node_type == NodeType.CONVERSATION)
+        folders = sum(1 for n, _, _ in self.tree_items if n.is_folder)
+        convs = sum(1 for n, _, _ in self.tree_items if not n.is_folder)
         self.stdscr.addstr(0, 0, f"Tree - {folders} folders, {convs} conversations", curses.A_BOLD)
         
         # Adjust offset
@@ -187,13 +185,12 @@ class ChatGPTTUI:
             
             # Build line
             indent = "  " * depth
-            if node.node_type == NodeType.FOLDER:
-                icon = TREE_CHARS["FOLDER_EXPANDED"] if node.expanded else TREE_CHARS["FOLDER_COLLAPSED"]
-                icon += " " + TREE_CHARS["FOLDER_ICON"]
+            if node.is_folder:
+                icon = "▼ 📁" if node.expanded else "▶ 📁"
                 name = node.name
                 attr = curses.color_pair(3) if not is_selected else curses.color_pair(1)
             else:
-                icon = TREE_CHARS["CONVERSATION_ICON"]
+                icon = "💬"
                 name = conv.title if conv else node.name
                 attr = curses.color_pair(1) if is_selected else 0
                 
@@ -264,8 +261,8 @@ class ChatGPTTUI:
             self.tree_selected = min(len(self.tree_items) - 1, self.tree_selected + 1)
         elif key in (10, 13, curses.KEY_ENTER, ord(' ')):  # Enter or Space
             node, conv, _ = self.tree_items[self.tree_selected]
-            if node.node_type == NodeType.FOLDER:
-                node.expanded = not node.expanded
+            if node.is_folder:
+                self.tree.toggle_folder(node.id)
                 self._refresh_tree()
             elif conv:
                 self.detail_view.set_conversation(conv)
@@ -281,24 +278,7 @@ class ChatGPTTUI:
             
     def _refresh_tree(self) -> None:
         """Refresh tree items."""
-        self.tree_items = []
-        conversations_map = {c.id: c for c in self.conversations}
-        
-        def add_items(items: List[Tuple[TreeNode, Optional[Conversation]]], depth: int = 0):
-            for node, conv in items:
-                self.tree_items.append((node, conv, depth))
-                if node.node_type == NodeType.FOLDER and node.expanded and hasattr(node, 'children'):
-                    children = []
-                    for child_id in node.children:
-                        child_node = self.organizer.tree_manager.organization_data.tree_nodes.get(child_id)
-                        if child_node:
-                            child_conv = conversations_map.get(child_id) if child_node.node_type == NodeType.CONVERSATION else None
-                            children.append((child_node, child_conv))
-                    children.sort(key=lambda x: (x[0].node_type.value, x[0].name.lower()))
-                    add_items(children, depth + 1)
-                    
-        organized = self.organizer.get_organized_conversations(self.conversations)
-        add_items(organized)
+        self.tree_items = self.tree.get_tree_items(self.conversations)
         
         # Keep selection in bounds
         if self.tree_selected >= len(self.tree_items):
@@ -327,11 +307,11 @@ class ChatGPTTUI:
             parent_id = None
             if self.tree_selected < len(self.tree_items):
                 node, _, _ = self.tree_items[self.tree_selected]
-                if node.node_type == NodeType.FOLDER:
+                if node.is_folder:
                     parent_id = node.id
                     
-            folder_id = self.organizer.create_folder(name, parent_id)
-            self.organizer.save_organization()
+            self.tree.create_folder(name, parent_id)
+            self.tree.save()
             self._refresh_tree()
             self.status_message = f"Created '{name}'"
         except Exception as e:
@@ -348,8 +328,8 @@ class ChatGPTTUI:
             return
             
         try:
-            node.name = new_name
-            self.organizer.save_organization()
+            self.tree.rename_node(node.id, new_name)
+            self.tree.save()
             self._refresh_tree()
             self.status_message = f"Renamed to '{new_name}'"
         except Exception as e:
@@ -361,14 +341,14 @@ class ChatGPTTUI:
             return
             
         node, _, _ = self.tree_items[self.tree_selected]
-        item_type = "folder" if node.node_type == NodeType.FOLDER else "conversation"
+        item_type = "folder" if node.is_folder else "conversation"
         
         if not confirm_delete(self.stdscr, node.name, item_type):
             return
             
         try:
-            self.organizer.tree_manager.delete_node(node.id)
-            self.organizer.save_organization()
+            self.tree.delete_node(node.id)
+            self.tree.save()
             self._refresh_tree()
             self.status_message = f"Deleted {item_type}"
         except Exception as e:
@@ -380,41 +360,18 @@ class ChatGPTTUI:
             return
             
         node, _, _ = self.tree_items[self.tree_selected]
-        
-        # Store current parent to detect cancellation
-        current_parent = node.parent_id if hasattr(node, 'parent_id') else None
-        
         folder_manager = FolderManager(self.stdscr)
-        result = folder_manager.select_folder(self.tree_items, self.tree_selected)
+        dest_id = folder_manager.select_folder(self.tree_items, self.tree_selected)
         
-        # If select_folder returns None and there are folders to choose from,
-        # it means either ESC was pressed or root was selected.
-        # We need to check if folders exist to distinguish.
-        has_folders = any(n.node_type == NodeType.FOLDER for n, _, _ in self.tree_items)
-        
-        if result is None and not has_folders:
-            # No folders exist, can't move
-            self.status_message = "No folders available"
-            return
-            
-        if result == node.id:
+        if dest_id == node.id:
             self.status_message = "Cannot move to itself"
             return
             
-        # Note: result can be None (root) or a folder ID
-        # Both are valid destinations
         try:
-            # Check if this is an unorganized conversation (not in tree yet)
-            if node.id not in self.organizer.tree_manager.organization_data.tree_nodes:
-                # Add it to the tree first
-                self.organizer.add_conversation(node.id, result)
-            else:
-                # It's already in the tree, just move it
-                self.organizer.tree_manager.move_node(node.id, result)
-            
-            self.organizer.save_organization()
+            self.tree.move_node(node.id, dest_id)
+            self.tree.save()
             self._refresh_tree()
-            self.status_message = f"Moved to {'root' if result is None else 'folder'}"
+            self.status_message = f"Moved to {'root' if dest_id is None else 'folder'}"
         except Exception as e:
             self.status_message = f"Error: {e}"
 
