@@ -15,6 +15,10 @@ from src.tui.detail import DetailView
 from src.tui.input import get_input, confirm, select_folder
 from src.tui.tree_view import TreeView
 from src.tui.search_overlay import SearchOverlay
+from src.tui.selection_manager import SelectionManager
+from src.tui.search_manager import SearchManager
+from src.tui.operations_manager import OperationsManager
+from src.tui.action_manager import ActionManager
 
 
 class ViewMode(Enum):
@@ -49,23 +53,75 @@ class TUI:
         self.tree_selected = 0
         self.sort_by_date = True  # True for date, False for alphabetical
         
-        # Search state
+        # Search state (keeping some here for compatibility)
         self.search_term = ""
         self.filtered_conversations = self.conversations  # Conversations matching search
-        self.search_matches = []  # List of indices for vim-style search
-        self.current_match_index = -1  # Current position in search matches
-        self.filter_mode = False  # Whether we're in filter mode (f) vs search mode (/)
         
-        # Multi-select state
-        self.selected_items = set()  # Set of node IDs that are selected
-        self.multi_select_mode = False  # Whether we're in multi-select mode
-        self.visual_mode = False  # Visual mode for range selection
-        self.visual_start = None  # Starting position for visual mode
+        # Initialize managers
+        self.selection_manager = SelectionManager()
+        self.search_manager = SearchManager()
+        self.action_manager = ActionManager()
+        # Note: operations_manager needs stdscr, so we'll initialize it in run()
         
-        # Undo system
-        self.undo_stack = []  # Stack of (action, data) tuples
-        self.last_action = None  # Last action for repeat
+    @property
+    def selected_items(self):
+        """Get selected items from selection manager."""
+        return self.selection_manager.selected_items
         
+    @selected_items.setter
+    def selected_items(self, value):
+        """Set selected items in selection manager."""
+        self.selection_manager.selected_items = value
+        
+    @property
+    def visual_mode(self):
+        """Get visual mode state from selection manager."""
+        return self.selection_manager.visual_mode
+        
+    @property
+    def visual_start(self):
+        """Get visual start position from selection manager."""
+        return self.selection_manager.visual_start
+        
+    @property
+    def search_matches(self):
+        """Get search matches from search manager."""
+        return self.search_manager.search_matches
+        
+    @search_matches.setter
+    def search_matches(self, value):
+        """Set search matches in search manager."""
+        self.search_manager.search_matches = value
+        
+    @property
+    def current_match_index(self):
+        """Get current match index from search manager."""
+        return self.search_manager.current_match_index
+        
+    @current_match_index.setter  
+    def current_match_index(self, value):
+        """Set current match index in search manager."""
+        self.search_manager.current_match_index = value
+        
+    @property
+    def filter_mode(self):
+        """Get filter mode from search manager."""
+        return self.search_manager.filter_mode
+        
+    @filter_mode.setter
+    def filter_mode(self, value):
+        """Set filter mode in search manager."""
+        self.search_manager.filter_mode = value
+        
+    @property
+    def undo_stack(self):
+        """Get undo stack from action manager."""
+        return self.action_manager.undo_stack
+        
+    @property
+    def last_action(self):
+        """Get last action from action manager."""
+        return self.action_manager.last_action
         
     def run(self, stdscr) -> None:
         """Main UI loop."""
@@ -83,6 +139,7 @@ class TUI:
         self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
         self.tree_view = TreeView(stdscr, 1, 0, width, height - 2)
         self.search_overlay = SearchOverlay(stdscr, 0, 0, width)
+        self.operations_manager = OperationsManager(self.tree, stdscr)
         
         # Initialize tree
         try:
@@ -158,7 +215,7 @@ class TUI:
                 self.search_overlay.deactivate()
                 self.current_view = ViewMode.TREE
                 term = self.search_overlay.get_search_term()
-                if self.filter_mode:
+                if self.search_manager.is_filter_mode():
                     # Filter mode - update filtered conversations
                     if term:
                         self._update_search(term)
@@ -169,9 +226,13 @@ class TUI:
                     # Search mode - find and jump to matches
                     if term:
                         self.search_term = term
-                        self.search_matches = self._find_search_matches(term)
+                        self.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
                         if self.search_matches:
-                            self._jump_to_match(0)  # Jump to first match
+                            tree_index, status = self.search_manager.jump_to_match(0)
+                            if tree_index is not None and tree_index < len(self.tree_items):
+                                self.tree_view.selected = tree_index
+                                self.tree_view._ensure_visible()
+                                self.status_message = status
                         else:
                             self.status_message = f"No matches found for: {term}"
                     else:
@@ -179,7 +240,7 @@ class TUI:
                         self.current_match_index = -1
             elif result == "search_changed":
                 term = self.search_overlay.get_search_term()
-                if self.filter_mode:
+                if self.search_manager.is_filter_mode():
                     # Filter mode - update filtered conversations as user types
                     if term:
                         self._update_search(term)
@@ -190,9 +251,13 @@ class TUI:
                     # Incremental search - update matches and jump to first match as user types
                     if term:
                         self.search_term = term
-                        self.search_matches = self._find_search_matches(term)
+                        self.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
                         if self.search_matches:
-                            self._jump_to_match(0)  # Jump to first match immediately
+                            tree_index, status = self.search_manager.jump_to_match(0)
+                            if tree_index is not None and tree_index < len(self.tree_items):
+                                self.tree_view.selected = tree_index
+                                self.tree_view._ensure_visible()
+                                self.status_message = status
                         else:
                             # Show no matches message but don't clear previous position
                             self.status_message = f"No matches for: {term}"
@@ -202,17 +267,25 @@ class TUI:
                         self.current_match_index = -1
             elif result == "search_next_match":
                 # Ctrl+G in search mode - go to next match without leaving search
-                if not self.filter_mode:  # Only works in search mode, not filter mode
+                if not self.search_manager.is_filter_mode():  # Only works in search mode, not filter mode
                     term = self.search_overlay.get_search_term()
                     if term:
                         self.search_term = term
-                        self.search_matches = self._find_search_matches(term)
+                        self.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
                         if self.search_matches:
                             # If we have a current match, go to next, otherwise start at first
                             if self.current_match_index >= 0:
-                                self._search_next()
+                                tree_index, status = self.search_manager.search_next()
+                                if tree_index is not None:
+                                    self.tree_view.selected = tree_index
+                                    self.tree_view._ensure_visible()
+                                self.status_message = status
                             else:
-                                self._jump_to_match(0)
+                                tree_index, status = self.search_manager.jump_to_match(0)
+                                if tree_index is not None and tree_index < len(self.tree_items):
+                                    self.tree_view.selected = tree_index
+                                    self.tree_view._ensure_visible()
+                                    self.status_message = status
                         else:
                             self.status_message = f"No matches found for: {term}"
             return
@@ -228,16 +301,19 @@ class TUI:
             self.running = False
         elif key == 27:  # ESC - clear selection if in multi-select mode, otherwise quit
             if self.selected_items:
-                self.selected_items.clear()
-                self.status_message = "Selection cleared"
+                self.status_message = self.selection_manager.clear_selection()
             else:
                 self.running = False
         elif key == ord('/'):
             self._start_vim_search()
         elif key == 1:  # Ctrl+A
-            self._select_all()
+            count = self.selection_manager.select_all(self.tree_items)
+            self.status_message = f"Selected {count} items"
         elif key == ord(' '):  # Space for multi-select
-            self._toggle_item_selection()
+            item = self.tree_view.get_selected()
+            if item:
+                node, _, _ = item
+                _, self.status_message = self.selection_manager.toggle_item_selection(node.id, node.name)
             
         # Tree navigation (only view mode now)
         if self.current_view == ViewMode.TREE:
@@ -252,7 +328,9 @@ class TUI:
         
         # Update visual mode selection if cursor moved
         if self.visual_mode and self.tree_view.selected != prev_selected:
-            self._update_visual_selection()
+            self.status_message = self.selection_manager.update_visual_selection(
+                self.tree_view.selected, self.tree_items
+            )
         
         if result == "select":
             item = self.tree_view.get_selected()
@@ -289,7 +367,7 @@ class TUI:
                 if item:
                     node, _, _ = item
                     if self.tree.move_item_up(node.id):
-                        self._save_last_action("move_up")
+                        self.action_manager.save_last_action("move_up")
                         self.tree.save()
                         self._refresh_tree()
                         self._move_cursor_to_item(node.id)
@@ -304,7 +382,7 @@ class TUI:
                 if item:
                     node, _, _ = item
                     if self.tree.move_item_down(node.id):
-                        self._save_last_action("move_down")
+                        self.action_manager.save_last_action("move_down")
                         self.tree.save()
                         self._refresh_tree()
                         self._move_cursor_to_item(node.id)
@@ -331,7 +409,9 @@ class TUI:
         elif result == "new_folder":
             self._create_folder()
         elif result == "visual_mode":
-            self._toggle_visual_mode()
+            self.status_message = self.selection_manager.toggle_visual_mode(
+                self.tree_view.selected, self.tree_items
+            )
         elif result == "indent":
             self._indent_items()
         elif result == "outdent":
@@ -339,9 +419,17 @@ class TUI:
         elif result == "quick_filter":
             self._quick_filter()
         elif key == ord('n'):  # Next search match
-            self._search_next()
+            tree_index, status = self.search_manager.search_next()
+            if tree_index is not None:
+                self.tree_view.selected = tree_index
+                self.tree_view._ensure_visible()
+            self.status_message = status
         elif key == ord('N'):  # Previous search match
-            self._search_previous()
+            tree_index, status = self.search_manager.search_previous()
+            if tree_index is not None:
+                self.tree_view.selected = tree_index
+                self.tree_view._ensure_visible()
+            self.status_message = status
         elif result == "filter_folders":
             self._filter_folders()
         elif result == "filter_conversations":
@@ -382,104 +470,129 @@ class TUI:
         
     def _create_folder(self) -> None:
         """Create new folder."""
-        name = get_input(self.stdscr, "Folder name:")
-        if not name:
-            return
-            
-        try:
-            parent_id = None
-            item = self.tree_view.get_selected()
-            if item:
-                node, _, _ = item
-                if node.is_folder:
-                    parent_id = node.id
+        if hasattr(self, 'operations_manager'):
+            self.status_message, _ = self.operations_manager.create_folder(
+                self.selected_items.copy(), self.tree_view.get_selected()
+            )
+            if "Created" in self.status_message:
+                self.selection_manager.clear_selection()
+                self._refresh_tree()
+        else:
+            # Fallback when operations_manager is not available (e.g., in tests)
+            from src.tui.input import get_input
+            name = get_input(self.stdscr, "Folder name:")
+            if not name:
+                return
+                
+            try:
+                parent_id = None
+                item = self.tree_view.get_selected()
+                if item:
+                    node, _, _ = item
+                    if node.is_folder:
+                        parent_id = node.id
+                        
+                folder_id = self.tree.create_folder(name, parent_id)
+                
+                # If we have selected items, move them into the new folder
+                if self.selected_items:
+                    moved_items = []
+                    for item_id in self.selected_items.copy():
+                        try:
+                            self.tree.move_node(item_id, folder_id)
+                            moved_items.append(self.tree.nodes[item_id].name)
+                        except Exception:
+                            pass
                     
-            folder_id = self.tree.create_folder(name, parent_id)
-            
-            # If we have selected items, move them into the new folder
-            if self.selected_items:
-                moved_items = []
-                for item_id in self.selected_items.copy():  # Copy to avoid modification during iteration
-                    try:
-                        self.tree.move_node(item_id, folder_id)
-                        moved_items.append(self.tree.nodes[item_id].name)
-                    except Exception:
-                        pass  # Skip items that can't be moved
-                
-                self.selected_items.clear()  # Clear selection after moving
-                
-                if moved_items:
-                    self.status_message = f"Created '{name}' and moved {len(moved_items)} items into it"
+                    self.selection_manager.clear_selection()
+                    
+                    if moved_items:
+                        self.status_message = f"Created '{name}' and moved {len(moved_items)} items into it"
+                    else:
+                        self.status_message = f"Created '{name}' (no items could be moved)"
                 else:
-                    self.status_message = f"Created '{name}' (no items could be moved)"
-            else:
-                self.status_message = f"Created '{name}'"
+                    self.status_message = f"Created '{name}'"
+                    
+                self.tree.save()
+                self._refresh_tree()
                 
-            self.tree.save()
-            self._refresh_tree()
-            
-        except Exception as e:
-            self.status_message = f"Error: {e}"
+            except Exception as e:
+                self.status_message = f"Error: {e}"
             
     def _rename_item(self) -> None:
         """Rename selected item."""
-        item = self.tree_view.get_selected()
-        if not item:
-            return
-            
-        node, _, _ = item
-        new_name = get_input(self.stdscr, f"Rename '{node.name}':", node.name)
-        if not new_name or new_name == node.name:
-            return
-            
-        try:
-            self.tree.rename_node(node.id, new_name)
-            self.tree.save()
-            self._refresh_tree()
-            self.status_message = f"Renamed to '{new_name}'"
-        except Exception as e:
-            self.status_message = f"Error: {e}"
+        if hasattr(self, 'operations_manager'):
+            self.status_message = self.operations_manager.rename_item(self.tree_view.get_selected())
+            if "Renamed" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
+        else:
+            # Fallback for tests
+            item = self.tree_view.get_selected()
+            if not item:
+                return
+            node, _, _ = item
+            new_name = get_input(self.stdscr, f"Rename '{node.name}':", node.name)
+            if not new_name or new_name == node.name:
+                return
+            try:
+                self.tree.rename_node(node.id, new_name)
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Renamed to '{new_name}'"
+            except Exception as e:
+                self.status_message = f"Error: {e}"
             
     def _delete_item(self) -> None:
         """Delete selected item."""
         item = self.tree_view.get_selected()
         if not item:
             return
-            
         node, _, _ = item
         item_type = "folder" if node.is_folder else "conversation"
         
         if not confirm(self.stdscr, f"Delete {item_type} '{node.name}'?"):
             return
             
-        try:
-            self.tree.delete_node(node.id)
-            self.tree.save()
-            self._refresh_tree()
-            self.status_message = f"Deleted {item_type}"
-        except Exception as e:
-            self.status_message = f"Error: {e}"
+        if hasattr(self, 'operations_manager'):
+            self.status_message = self.operations_manager.delete_item(item)
+            if "Deleted" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
+        else:
+            # Fallback for tests
+            try:
+                self.tree.delete_node(node.id)
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Deleted {item_type}"
+            except Exception as e:
+                self.status_message = f"Error: {e}"
             
     def _move_item(self) -> None:
         """Move selected item."""
-        item = self.tree_view.get_selected()
-        if not item:
-            return
-            
-        node, _, _ = item
-        dest_id = select_folder(self.stdscr, self.tree_items)
-        
-        if dest_id == node.id:
-            self.status_message = "Cannot move to itself"
-            return
-            
-        try:
-            self.tree.move_node(node.id, dest_id)
-            self.tree.save()
-            self._refresh_tree()
-            self.status_message = f"Moved to {'root' if dest_id is None else 'folder'}"
-        except Exception as e:
-            self.status_message = f"Error: {e}"
+        if hasattr(self, 'operations_manager'):
+            self.status_message = self.operations_manager.move_item(self.tree_view.get_selected())
+            if "Moved" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
+        else:
+            # Fallback for tests
+            item = self.tree_view.get_selected()
+            if not item:
+                return
+            node, _, _ = item
+            dest_id = select_folder(self.stdscr, self.tree_items)
+            if dest_id == node.id:
+                self.status_message = "Cannot move to itself"
+                return
+            try:
+                self.tree.move_node(node.id, dest_id)
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Moved to {'root' if dest_id is None else 'folder'}"
+            except Exception as e:
+                self.status_message = f"Error: {e}"
             
     def _show_tree_help(self) -> None:
         """Show help dialog for tree view."""
@@ -607,73 +720,58 @@ class TUI:
         self.filtered_conversations = self.conversations
         self._refresh_tree()
         
-    def _select_all(self) -> None:
-        """Select all visible items."""
-        for node, _, _ in self.tree_items:
-            self.selected_items.add(node.id)
-        self.status_message = f"Selected {len(self.selected_items)} items"
-        
-    def _toggle_item_selection(self) -> None:
-        """Toggle selection of current item."""
-        item = self.tree_view.get_selected()
-        if not item:
-            return
-            
-        node, _, _ = item
-        if node.id in self.selected_items:
-            self.selected_items.remove(node.id)
-            self.status_message = f"Deselected '{node.name}'"
-        else:
-            self.selected_items.add(node.id)
-            self.status_message = f"Selected '{node.name}'"
             
     def _bulk_move_up(self) -> None:
         """Move all selected items up."""
-        if not self.selected_items:
-            return
-            
-        # Get items in tree order
-        selected_in_order = []
-        for node, _, _ in self.tree_items:
-            if node.id in self.selected_items:
-                selected_in_order.append(node.id)
-                
-        # Move from top to bottom to maintain relative order
-        moved = 0
-        for item_id in selected_in_order:
-            if self.tree.move_item_up(item_id):
-                moved += 1
-                
-        if moved > 0:
-            self.tree.save()
-            self._refresh_tree()
-            self.status_message = f"Moved {moved} items up"
+        if hasattr(self, 'operations_manager'):
+            self.status_message = self.operations_manager.bulk_move_up(self.selected_items, self.tree_items)
+            if "Moved" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
         else:
-            self.status_message = "Cannot move selected items up"
+            # Fallback for tests
+            if not self.selected_items:
+                return
+            selected_in_order = []
+            for node, _, _ in self.tree_items:
+                if node.id in self.selected_items:
+                    selected_in_order.append(node.id)
+            moved = 0
+            for item_id in selected_in_order:
+                if self.tree.move_item_up(item_id):
+                    moved += 1
+            if moved > 0:
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Moved {moved} items up"
+            else:
+                self.status_message = "Cannot move selected items up"
             
     def _bulk_move_down(self) -> None:
         """Move all selected items down."""
-        if not self.selected_items:
-            return
-            
-        # Get items in reverse tree order
-        selected_in_order = []
-        for node, _, _ in reversed(self.tree_items):
-            if node.id in self.selected_items:
-                selected_in_order.append(node.id)
-                
-        # Move from bottom to top to maintain relative order
-        moved = 0
-        for item_id in selected_in_order:
-            if self.tree.move_item_down(item_id):
-                moved += 1
-                
-        if moved > 0:
-            self.tree.save()
-            self._refresh_tree()
-            self.status_message = f"Moved {moved} items down"
+        if hasattr(self, 'operations_manager'):
+            self.status_message = self.operations_manager.bulk_move_down(self.selected_items, self.tree_items)
+            if "Moved" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
         else:
-            self.status_message = "Cannot move selected items down"
+            # Fallback for tests
+            if not self.selected_items:
+                return
+            selected_in_order = []
+            for node, _, _ in reversed(self.tree_items):
+                if node.id in self.selected_items:
+                    selected_in_order.append(node.id)
+            moved = 0
+            for item_id in selected_in_order:
+                if self.tree.move_item_down(item_id):
+                    moved += 1
+            if moved > 0:
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Moved {moved} items down"
+            else:
+                self.status_message = "Cannot move selected items down"
             
     def _bulk_move_items(self) -> None:
         """Move all selected items to a new parent."""
@@ -718,55 +816,55 @@ class TUI:
     
     def _undo_action(self) -> None:
         """Undo last action."""
-        if not self.undo_stack:
+        undo_info = self.action_manager.get_undo_action()
+        if not undo_info:
             self.status_message = "Nothing to undo"
             return
             
-        action, data = self.undo_stack.pop()
+        action, data = undo_info
         
-        if action == "move":
-            # Undo move: move back to original position
-            node_id, original_parent = data
-            try:
+        # Process the undo based on action type
+        try:
+            if action == "move":
+                # Undo move: move back to original position
+                node_id, original_parent = data
                 self.tree.move_node(node_id, original_parent)
                 self.tree.save()
                 self._refresh_tree()
                 self.status_message = f"Undid move operation"
-            except Exception as e:
-                self.status_message = f"Undo failed: {e}"
-        elif action in ("indent", "outdent"):
-            # Undo indent/outdent: restore all items to original positions
-            original_positions = data
-            try:
+            elif action in ("indent", "outdent"):
+                # Undo indent/outdent: restore all items to original positions
+                original_positions = data
                 for item_id, original_parent in original_positions:
                     if item_id in self.tree.nodes:
                         self.tree.move_node(item_id, original_parent)
                 self.tree.save()
                 self._refresh_tree()
                 self.status_message = f"Undid {action} operation"
-            except Exception as e:
-                self.status_message = f"Undo failed: {e}"
-        elif action == "delete":
-            # Undo delete: restore from data
-            self.status_message = "Delete undo not implemented yet"
-        elif action == "create":
-            # Undo create: delete the created item
-            node_id = data
-            if node_id in self.tree.nodes:
-                self.tree.delete_node(node_id)
-                self.tree.save()
-                self._refresh_tree()
-                self.status_message = "Undid create operation"
-        else:
-            self.status_message = f"Cannot undo action: {action}"
+            elif action == "delete":
+                # Undo delete: restore from data
+                self.status_message = "Delete undo not implemented yet"
+            elif action == "create":
+                # Undo create: delete the created item
+                node_id = data
+                if node_id in self.tree.nodes:
+                    self.tree.delete_node(node_id)
+                    self.tree.save()
+                    self._refresh_tree()
+                    self.status_message = "Undid create operation"
+            else:
+                self.status_message = f"Cannot undo action: {action}"
+        except Exception as e:
+            self.status_message = f"Undo failed: {e}"
     
     def _repeat_last_action(self) -> None:
         """Repeat last action."""
-        if not self.last_action:
+        last_action = self.action_manager.get_last_action()
+        if not last_action:
             self.status_message = "No action to repeat"
             return
             
-        action_type, action_data = self.last_action
+        action_type, action_data = last_action
         
         if action_type == "move_up":
             item = self.tree_view.get_selected()
@@ -789,16 +887,6 @@ class TUI:
         else:
             self.status_message = f"Cannot repeat action: {action_type}"
     
-    def _save_undo_state(self, action: str, data: any) -> None:
-        """Save state for undo functionality."""
-        self.undo_stack.append((action, data))
-        # Limit undo stack size
-        if len(self.undo_stack) > 20:
-            self.undo_stack.pop(0)
-            
-    def _save_last_action(self, action_type: str, action_data: any = None) -> None:
-        """Save last action for repeat functionality."""
-        self.last_action = (action_type, action_data)
     
     def _refresh_conversations(self) -> None:
         """Refresh conversations from file."""
@@ -810,210 +898,114 @@ class TUI:
         except Exception as e:
             self.status_message = f"Refresh failed: {e}"
     
-    def _toggle_visual_mode(self) -> None:
-        """Toggle visual selection mode."""
-        if not self.visual_mode:
-            # Enter visual mode
-            self.visual_mode = True
-            self.visual_start = self.tree_view.selected
-            # Start with current item selected
-            if self.visual_start < len(self.tree_items):
-                node, _, _ = self.tree_items[self.visual_start]
-                self.selected_items.add(node.id)
-            self.status_message = "Visual mode activated - use arrows to select range"
-        else:
-            # Exit visual mode
-            self.visual_mode = False
-            self.visual_start = None
-            self.status_message = f"Visual mode deactivated - {len(self.selected_items)} items selected"
-    
-    def _update_visual_selection(self) -> None:
-        """Update selection based on visual mode range."""
-        if not self.visual_mode or self.visual_start is None:
-            return
-            
-        # Clear previous selection and rebuild based on range
-        self.selected_items.clear()
-        
-        current_pos = self.tree_view.selected
-        start_pos = self.visual_start
-        
-        # Determine the range (inclusive)
-        min_pos = min(start_pos, current_pos)
-        max_pos = max(start_pos, current_pos)
-        
-        # Select all items in the range
-        for i in range(min_pos, max_pos + 1):
-            if i < len(self.tree_items):
-                node, _, _ = self.tree_items[i]
-                self.selected_items.add(node.id)
-                
-        # Update status to show selection size
-        self.status_message = f"Visual: {len(self.selected_items)} items selected"
     
     def _indent_items(self) -> None:
         """Indent selected items (move them into a sibling folder)."""
-        if not self.selected_items:
-            self.status_message = "No items selected to indent"
-            return
-            
-        # Find a suitable folder to move items into
-        current_item = self.tree_view.get_selected()
-        if not current_item:
-            self.status_message = "Cannot determine target for indentation"
-            return
-            
-        current_node, _, _ = current_item
-        
-        # Look for a folder at the same level to move items into
-        parent_id = current_node.parent_id
-        siblings = self.tree.nodes[parent_id].children if parent_id else self.tree.root_nodes
-        
-        # Find first folder sibling
-        target_folder = None
-        for sibling_id in siblings:
-            sibling = self.tree.nodes.get(sibling_id)
-            if sibling and sibling.is_folder and sibling_id not in self.selected_items:
-                target_folder = sibling_id
-                break
-                
-        if target_folder:
-            # Save undo state before making changes
+        if hasattr(self, 'operations_manager'):
+            self.status_message, original_positions = self.operations_manager.indent_items(
+                self.selected_items, self.tree_view.get_selected()
+            )
+            if original_positions:
+                self.action_manager.save_undo_state("indent", original_positions)
+            if "Indented" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
+                self.selected_items.clear()
+        else:
+            # Fallback for tests
+            if not self.selected_items:
+                self.status_message = "No items selected to indent"
+                return
+            current_item = self.tree_view.get_selected()
+            if not current_item:
+                self.status_message = "Cannot determine target for indentation"
+                return
+            current_node, _, _ = current_item
+            parent_id = current_node.parent_id
+            siblings = self.tree.nodes[parent_id].children if parent_id else self.tree.root_nodes
+            target_folder = None
+            for sibling_id in siblings:
+                sibling = self.tree.nodes.get(sibling_id)
+                if sibling and sibling.is_folder and sibling_id not in self.selected_items:
+                    target_folder = sibling_id
+                    break
+            if target_folder:
+                original_positions = []
+                for item_id in self.selected_items:
+                    if item_id in self.tree.nodes:
+                        node = self.tree.nodes[item_id]
+                        original_positions.append((item_id, node.parent_id))
+                if original_positions:
+                    self.action_manager.save_undo_state("indent", original_positions)
+                moved = 0
+                for item_id in self.selected_items:
+                    try:
+                        self.tree.move_node(item_id, target_folder)
+                        moved += 1
+                    except Exception:
+                        pass
+                if moved > 0:
+                    self.tree.save()
+                    self._refresh_tree()
+                    self.selected_items.clear()
+                    self.status_message = f"Indented {moved} items into folder"
+                else:
+                    self.status_message = "Could not indent items"
+            else:
+                self.status_message = "No folder available for indentation"
+    
+    def _outdent_items(self) -> None:
+        """Outdent selected items (move them to parent level)."""
+        if hasattr(self, 'operations_manager'):
+            self.status_message, original_positions = self.operations_manager.outdent_items(self.selected_items)
+            if original_positions:
+                self.action_manager.save_undo_state("outdent", original_positions)
+            if "Outdented" in self.status_message:
+                self.tree.save()
+                self._refresh_tree()
+                self.selected_items.clear()
+        else:
+            # Fallback for tests
+            if not self.selected_items:
+                self.status_message = "No items selected to outdent"
+                return
             original_positions = []
             for item_id in self.selected_items:
                 if item_id in self.tree.nodes:
                     node = self.tree.nodes[item_id]
                     original_positions.append((item_id, node.parent_id))
-            
             if original_positions:
-                self._save_undo_state("indent", original_positions)
-            
+                self.action_manager.save_undo_state("outdent", original_positions)
             moved = 0
             for item_id in self.selected_items:
-                try:
-                    self.tree.move_node(item_id, target_folder)
-                    moved += 1
-                except Exception:
-                    pass
-                    
+                node = self.tree.nodes.get(item_id)
+                if node and node.parent_id:
+                    grandparent_id = self.tree.nodes[node.parent_id].parent_id if node.parent_id in self.tree.nodes else None
+                    try:
+                        self.tree.move_node(item_id, grandparent_id)
+                        moved += 1
+                    except Exception:
+                        pass
             if moved > 0:
                 self.tree.save()
                 self._refresh_tree()
                 self.selected_items.clear()
-                self.status_message = f"Indented {moved} items into folder"
+                self.status_message = f"Outdented {moved} items"
             else:
-                self.status_message = "Could not indent items"
-        else:
-            self.status_message = "No folder available for indentation"
-    
-    def _outdent_items(self) -> None:
-        """Outdent selected items (move them to parent level)."""
-        if not self.selected_items:
-            self.status_message = "No items selected to outdent"
-            return
-            
-        # Save undo state before making changes
-        original_positions = []
-        for item_id in self.selected_items:
-            if item_id in self.tree.nodes:
-                node = self.tree.nodes[item_id]
-                original_positions.append((item_id, node.parent_id))
-        
-        if original_positions:
-            self._save_undo_state("outdent", original_positions)
-            
-        moved = 0
-        for item_id in self.selected_items:
-            node = self.tree.nodes.get(item_id)
-            if node and node.parent_id:
-                # Move to the parent's parent
-                grandparent_id = self.tree.nodes[node.parent_id].parent_id if node.parent_id in self.tree.nodes else None
-                try:
-                    self.tree.move_node(item_id, grandparent_id)
-                    moved += 1
-                except Exception:
-                    pass
-                    
-        if moved > 0:
-            self.tree.save()
-            self._refresh_tree()
-            self.selected_items.clear()
-            self.status_message = f"Outdented {moved} items"
-        else:
-            self.status_message = "Could not outdent items (already at top level?)"
+                self.status_message = "Could not outdent items (already at top level?)"
     
     def _quick_filter(self) -> None:
         """Start filter mode (filters the tree)."""
-        self.filter_mode = True
+        self.status_message = self.search_manager.start_filter_mode()
         self.current_view = ViewMode.SEARCH
         self.search_overlay.activate()
-        self.status_message = "Filter mode: type to filter conversations"
     
     def _start_vim_search(self) -> None:
         """Start vim-style search that jumps to matches."""
-        self.filter_mode = False
+        self.status_message = self.search_manager.start_search_mode()
         self.current_view = ViewMode.SEARCH
         self.search_overlay.activate()
-        self.status_message = "Incremental search: type to find and jump to matches"
     
-    def _find_search_matches(self, term: str) -> List[int]:
-        """Find all tree items that match the search term."""
-        if not term:
-            return []
-            
-        matches = []
-        term_lower = term.lower()
-        
-        for i, (node, conv, _) in enumerate(self.tree_items):
-            # Search in node name
-            if term_lower in node.name.lower():
-                matches.append(i)
-                continue
-                
-            # Search in conversation title and content
-            if conv:
-                if term_lower in conv.title.lower():
-                    matches.append(i)
-                    continue
-                    
-                # Search in message content
-                for message in conv.messages:
-                    if term_lower in message.content.lower():
-                        matches.append(i)
-                        break
-                        
-        return matches
-    
-    def _jump_to_match(self, match_index: int) -> None:
-        """Jump to a specific search match."""
-        if 0 <= match_index < len(self.search_matches):
-            tree_index = self.search_matches[match_index]
-            if tree_index < len(self.tree_items):
-                self.tree_view.selected = tree_index
-                self.tree_view._ensure_visible()
-                self.current_match_index = match_index
-                
-                # Show match info
-                total_matches = len(self.search_matches)
-                self.status_message = f"Match {match_index + 1}/{total_matches}: {self.search_term}"
-    
-    def _search_next(self) -> None:
-        """Jump to next search match."""
-        if not self.search_matches:
-            self.status_message = "No search results. Use / to search."
-            return
-            
-        next_index = (self.current_match_index + 1) % len(self.search_matches)
-        self._jump_to_match(next_index)
-    
-    def _search_previous(self) -> None:
-        """Jump to previous search match."""
-        if not self.search_matches:
-            self.status_message = "No search results. Use / to search."
-            return
-            
-        prev_index = (self.current_match_index - 1) % len(self.search_matches)
-        self._jump_to_match(prev_index)
     
     def _filter_folders(self) -> None:
         """Show only folders."""
