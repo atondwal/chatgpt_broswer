@@ -499,7 +499,357 @@ class TestTUIEnhancements:
         self.tui._quick_filter()
         
         assert self.tui.current_view == ViewMode.SEARCH
-        assert "Quick filter mode" in self.tui.status_message
+        assert self.tui.filter_mode == True
+        assert "Filter mode" in self.tui.status_message
+    
+    def test_indent_outdent_undo(self):
+        """Test that indent/outdent operations can be undone."""
+        # Create test folder and items
+        folder_id = self.tui.tree.create_folder("Test Folder")
+        conv_id = "test_conv_1"
+        self.tui.tree.add_conversation(conv_id, "Test Conversation")
+        
+        # Set up selection
+        self.tui.selected_items = {conv_id}
+        mock_item = (self.tui.tree.nodes[conv_id], Mock(title="Test"), 0)
+        self.tui.tree_view.get_selected = Mock(return_value=mock_item)
+        
+        # Test indent with undo
+        original_parent = self.tui.tree.nodes[conv_id].parent_id
+        self.tui._indent_items()
+        
+        # Should have saved undo state
+        assert len(self.tui.undo_stack) > 0
+        action, data = self.tui.undo_stack[-1]
+        assert action == "indent"
+        assert (conv_id, original_parent) in data
+        
+        # Undo the indent
+        self.tui._undo_action()
+        assert "Undid indent operation" in self.tui.status_message
+        assert self.tui.tree.nodes[conv_id].parent_id == original_parent
+        
+        # Test outdent with undo
+        # First move item to folder
+        self.tui.tree.move_node(conv_id, folder_id)
+        self.tui.selected_items = {conv_id}
+        
+        # Outdent
+        self.tui._outdent_items()
+        
+        # Should have saved undo state
+        assert len(self.tui.undo_stack) > 0
+        action, data = self.tui.undo_stack[-1]
+        assert action == "outdent"
+        assert (conv_id, folder_id) in data
+        
+        # Undo the outdent
+        self.tui._undo_action()
+        assert "Undid outdent operation" in self.tui.status_message
+        assert self.tui.tree.nodes[conv_id].parent_id == folder_id
+    
+    def test_undo_multiple_items(self):
+        """Test undo with multiple selected items."""
+        # Create multiple items
+        folder_id = self.tui.tree.create_folder("Target Folder")
+        conv_id1 = "conv_1"
+        conv_id2 = "conv_2"
+        self.tui.tree.add_conversation(conv_id1, "Conv 1")
+        self.tui.tree.add_conversation(conv_id2, "Conv 2")
+        
+        # Select multiple items
+        self.tui.selected_items = {conv_id1, conv_id2}
+        mock_item = (self.tui.tree.nodes[conv_id1], Mock(title="Conv 1"), 0)
+        self.tui.tree_view.get_selected = Mock(return_value=mock_item)
+        
+        # Get original positions
+        orig_parent1 = self.tui.tree.nodes[conv_id1].parent_id
+        orig_parent2 = self.tui.tree.nodes[conv_id2].parent_id
+        
+        # Perform indent
+        self.tui._indent_items()
+        
+        # Verify undo data includes both items
+        action, data = self.tui.undo_stack[-1]
+        assert action == "indent"
+        assert (conv_id1, orig_parent1) in data
+        assert (conv_id2, orig_parent2) in data
+        
+        # Undo and verify both items restored
+        self.tui._undo_action()
+        assert self.tui.tree.nodes[conv_id1].parent_id == orig_parent1
+        assert self.tui.tree.nodes[conv_id2].parent_id == orig_parent2
+    
+    def test_vim_search_functionality(self):
+        """Test vim-style search and navigation."""
+        # Create test data
+        self.tui.tree.add_conversation("test1", "Test Conversation 1")
+        self.tui.tree.add_conversation("test2", "Another Test")
+        self.tui.tree.add_conversation("other", "Different Topic")
+        self.tui._refresh_tree()
+        
+        # Test search matches
+        matches = self.tui._find_search_matches("test")
+        assert len(matches) >= 2  # Should find at least 2 matches
+        
+        # Test jumping to matches
+        self.tui.search_matches = matches
+        self.tui._jump_to_match(0)
+        assert self.tui.current_match_index == 0
+        assert "Match 1/" in self.tui.status_message
+        
+        # Test next/previous navigation
+        self.tui._search_next()
+        assert self.tui.current_match_index == 1
+        assert "Match 2/" in self.tui.status_message
+        
+        self.tui._search_previous()
+        assert self.tui.current_match_index == 0
+        
+        # Test wraparound
+        self.tui._search_previous()
+        assert self.tui.current_match_index == len(matches) - 1  # Should wrap to last
+        
+        # Test with no matches
+        self.tui.search_matches = []
+        self.tui._search_next()
+        assert "No search results" in self.tui.status_message
+    
+    def test_ctrl_g_in_search_mode(self):
+        """Test Ctrl+G behavior in search mode."""
+        from src.tui.search_overlay import SearchOverlay
+        
+        # Create test data
+        self.tui.tree.add_conversation("test1", "Test Conversation 1")
+        self.tui.tree.add_conversation("test2", "Another Test")
+        self.tui._refresh_tree()
+        
+        # Mock search overlay
+        overlay = SearchOverlay(Mock(), 0, 0, 80)
+        overlay.activate()  # Must activate before handling input
+        overlay.search_term = "test"
+        self.tui.search_overlay = overlay
+        
+        # Test Ctrl+G returns correct result
+        result = overlay.handle_input(7)  # Ctrl+G
+        assert result == "search_next_match"
+        
+        # Test that search stays active after Ctrl+G
+        assert overlay.active == True
+        
+        # Test navigation with Ctrl+G again
+        result = overlay.handle_input(7)  # Ctrl+G again
+        assert result == "search_next_match"
+        assert overlay.active == True  # Should still be active
+    
+    def test_ctrl_w_delete_word(self):
+        """Test Ctrl+W word deletion in search mode."""
+        from src.tui.search_overlay import SearchOverlay
+        
+        overlay = SearchOverlay(Mock(), 0, 0, 80)
+        overlay.activate()
+        
+        # Test deleting word from "hello world test"
+        overlay.search_term = "hello world test"
+        overlay.cursor_pos = len(overlay.search_term)  # At end
+        
+        # Ctrl+W should delete "test"
+        result = overlay.handle_input(23)  # Ctrl+W
+        assert result == "search_changed"
+        assert overlay.search_term == "hello world "
+        assert overlay.cursor_pos == len("hello world ")
+        
+        # Ctrl+W again should delete "world "
+        result = overlay.handle_input(23)  # Ctrl+W
+        assert result == "search_changed"
+        assert overlay.search_term == "hello "
+        assert overlay.cursor_pos == len("hello ")
+        
+        # Ctrl+W again should delete "hello "
+        result = overlay.handle_input(23)  # Ctrl+W
+        assert result == "search_changed"
+        assert overlay.search_term == ""
+        assert overlay.cursor_pos == 0
+        
+        # Ctrl+W on empty string should do nothing
+        result = overlay.handle_input(23)  # Ctrl+W
+        assert result == "search_changed"
+        assert overlay.search_term == ""
+        assert overlay.cursor_pos == 0
+    
+    def test_ctrl_w_with_cursor_in_middle(self):
+        """Test Ctrl+W behavior when cursor is in middle of text."""
+        from src.tui.search_overlay import SearchOverlay
+        
+        overlay = SearchOverlay(Mock(), 0, 0, 80)
+        overlay.activate()
+        
+        # Test with cursor in middle: "hello wo|rld test"
+        overlay.search_term = "hello world test"
+        overlay.cursor_pos = 8  # After "hello wo"
+        
+        # Ctrl+W should delete "wo" (partial word)
+        result = overlay.handle_input(23)  # Ctrl+W
+        assert result == "search_changed"
+        assert overlay.search_term == "hello rld test"
+        assert overlay.cursor_pos == 6  # After "hello "
+        
+        # Ctrl+W again should delete "hello "
+        result = overlay.handle_input(23)  # Ctrl+W
+        assert result == "search_changed"
+        assert overlay.search_term == "rld test"
+        assert overlay.cursor_pos == 0
+    
+    def test_incremental_search(self):
+        """Test that search is incremental and jumps to matches as you type."""
+        # Create test data
+        self.tui.tree.add_conversation("test1", "Testing Conversation")
+        self.tui.tree.add_conversation("prod1", "Production Code")
+        self.tui.tree.add_conversation("test2", "Another Test")
+        self.tui._refresh_tree()
+        
+        # Mock search overlay
+        overlay = Mock()
+        self.tui.search_overlay = overlay
+        
+        # Simulate typing "tes" character by character
+        overlay.get_search_term.return_value = "t"
+        self.tui._handle_key(ord('/'))  # Start search
+        
+        # Simulate "search_changed" result for each character
+        # This would normally be triggered by typing in the overlay
+        
+        # Type "t" - should find both "Testing" and "Another Test" 
+        overlay.get_search_term.return_value = "t"
+        result = "search_changed"
+        # Manually call the search_changed logic
+        term = "t"
+        self.tui.search_term = term
+        self.tui.search_matches = self.tui._find_search_matches(term)
+        original_selection = self.tui.tree_view.selected
+        if self.tui.search_matches:
+            self.tui._jump_to_match(0)
+        
+        # Should have found matches and jumped to first one
+        assert len(self.tui.search_matches) >= 2  # "Testing" and "Another Test"
+        assert self.tui.current_match_index == 0
+        
+        # Type "te" - should still find matches but maybe fewer
+        term = "te"
+        self.tui.search_term = term  
+        self.tui.search_matches = self.tui._find_search_matches(term)
+        if self.tui.search_matches:
+            self.tui._jump_to_match(0)
+        
+        assert len(self.tui.search_matches) >= 2  # "Testing" and "Test"
+        assert self.tui.current_match_index == 0
+        
+        # Type "tes" - should still find both test-related items
+        term = "tes"
+        self.tui.search_term = term
+        self.tui.search_matches = self.tui._find_search_matches(term)
+        if self.tui.search_matches:
+            self.tui._jump_to_match(0)
+            
+        assert len(self.tui.search_matches) >= 2
+        assert self.tui.current_match_index == 0
+    
+    def test_visual_mode_selection(self):
+        """Test that visual mode properly selects ranges."""
+        # Clear existing items and create fresh test data
+        self.tui.selected_items.clear()
+        
+        # We already have some conversations from setup, let's use them
+        self.tui._refresh_tree()
+        
+        # Ensure we have at least 2 items to test with
+        assert len(self.tui.tree_items) >= 2
+        
+        # Start at position 0
+        self.tui.tree_view.selected = 0
+        
+        # Enter visual mode
+        self.tui._toggle_visual_mode()
+        assert self.tui.visual_mode == True
+        assert self.tui.visual_start == 0
+        assert len(self.tui.selected_items) == 1  # Should select current item
+        
+        # Move down to position 1 (should select items 0, 1)
+        self.tui.tree_view.selected = 1
+        self.tui._update_visual_selection()
+        
+        assert len(self.tui.selected_items) == 2  # Items 0, 1
+        assert "Visual: 2 items selected" in self.tui.status_message
+        
+        # Move back to position 0 (should select just item 0)
+        self.tui.tree_view.selected = 0
+        self.tui._update_visual_selection()
+        
+        assert len(self.tui.selected_items) == 1  # Just item 0
+        assert "Visual: 1 items selected" in self.tui.status_message
+            
+        # Exit visual mode
+        self.tui._toggle_visual_mode()
+        assert self.tui.visual_mode == False
+        assert self.tui.visual_start is None
+        assert "Visual mode deactivated" in self.tui.status_message
+        # Selection should be preserved  
+        assert len(self.tui.selected_items) == 1
+    
+    def test_filter_vs_search_modes(self):
+        """Test that f activates filter mode and / activates search mode."""
+        # Create test data by adding to both tree and conversations list
+        from src.core.models import Conversation
+        python_conv1 = Conversation("python1", "Python Tutorial", [], create_time=1234567890)
+        java_conv = Conversation("java1", "Java Guide", [], create_time=1234567891)
+        python_conv2 = Conversation("python2", "Advanced Python", [], create_time=1234567892)
+        
+        self.tui.conversations.extend([python_conv1, java_conv, python_conv2])
+        self.tui.filtered_conversations = self.tui.conversations
+        self.tui.tree.add_conversation("python1", "Python Tutorial")
+        self.tui.tree.add_conversation("java1", "Java Guide") 
+        self.tui.tree.add_conversation("python2", "Advanced Python")
+        self.tui._refresh_tree()
+        
+        original_conv_count = len(self.tui.conversations)
+        
+        # Test filter mode (f key)
+        self.tui._quick_filter()
+        assert self.tui.filter_mode == True
+        assert self.tui.current_view.value == "search"
+        assert "Filter mode" in self.tui.status_message
+        
+        # Mock search overlay
+        overlay = Mock()
+        overlay.get_search_term.return_value = "python"
+        self.tui.search_overlay = overlay
+        
+        # Simulate filter submission
+        self.tui.filter_mode = True  # Ensure we're in filter mode
+        term = "python"
+        self.tui._update_search(term)
+        
+        # Should filter conversations  
+        assert len(self.tui.filtered_conversations) < original_conv_count
+        filtered_titles = [conv.title for conv in self.tui.filtered_conversations]
+        # Check if any conversation contains "python" (case insensitive)
+        assert any("python" in title.lower() for title in filtered_titles)
+        
+        # Reset filter
+        self.tui._clear_search()
+        assert len(self.tui.filtered_conversations) == original_conv_count
+        
+        # Test search mode (/ key)
+        self.tui._start_vim_search()
+        assert self.tui.filter_mode == False
+        assert self.tui.current_view.value == "search"
+        assert "Incremental search" in self.tui.status_message
+        
+        # In search mode, should find matches but not filter
+        matches = self.tui._find_search_matches("python")
+        assert len(matches) > 0
+        # Conversations should still be unfiltered
+        assert len(self.tui.filtered_conversations) == original_conv_count
     
     def teardown_method(self):
         """Clean up test files."""

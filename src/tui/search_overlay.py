@@ -31,6 +31,28 @@ class SearchOverlay:
     def get_search_term(self) -> str:
         """Get current search term."""
         return self.search_term
+    
+    def _delete_previous_word(self) -> None:
+        """Delete the word before the cursor (Ctrl+W behavior)."""
+        if self.cursor_pos == 0:
+            return
+            
+        # Find the start of the previous word
+        # First, skip any whitespace before cursor
+        pos = self.cursor_pos - 1
+        while pos >= 0 and self.search_term[pos].isspace():
+            pos -= 1
+            
+        # Then, skip the word characters
+        while pos >= 0 and not self.search_term[pos].isspace():
+            pos -= 1
+            
+        # pos is now at the character before the word (or -1)
+        word_start = pos + 1
+        
+        # Delete from word_start to cursor_pos
+        self.search_term = self.search_term[:word_start] + self.search_term[self.cursor_pos:]
+        self.cursor_pos = word_start
         
     def handle_input(self, key: int) -> Optional[str]:
         """Handle keyboard input."""
@@ -39,6 +61,11 @@ class SearchOverlay:
             
         if key == 27:  # ESC
             return "search_cancelled"
+        elif key == 7:  # Ctrl+G
+            return "search_next_match"
+        elif key == 23:  # Ctrl+W
+            self._delete_previous_word()
+            return "search_changed"
         elif key in (10, 13):  # Enter
             return "search_submitted"
         elif key in (curses.KEY_BACKSPACE, 127):

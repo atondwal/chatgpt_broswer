@@ -7,6 +7,7 @@ import logging
 import sys
 from enum import Enum
 from pathlib import Path
+from typing import List
 
 from src.core.loader import load_conversations
 from src.tree.tree import ConversationTree
@@ -51,6 +52,9 @@ class TUI:
         # Search state
         self.search_term = ""
         self.filtered_conversations = self.conversations  # Conversations matching search
+        self.search_matches = []  # List of indices for vim-style search
+        self.current_match_index = -1  # Current position in search matches
+        self.filter_mode = False  # Whether we're in filter mode (f) vs search mode (/)
         
         # Multi-select state
         self.selected_items = set()  # Set of node IDs that are selected
@@ -123,9 +127,12 @@ class TUI:
             # Show help
             multi_info = f" [{len(self.selected_items)} selected]" if self.selected_items else ""
             visual_info = " [VISUAL]" if self.visual_mode else ""
+            search_info = f" [{len(self.search_matches)} matches]" if self.search_matches else ""
+            filter_info = f" [{len(self.filtered_conversations)} filtered]" if len(self.filtered_conversations) != len(self.conversations) else ""
             help_text = {
-                ViewMode.TREE: f"gg/G:Top/Bot x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}",
-                ViewMode.SEARCH: "Type:Search ESC:Cancel Enter:Apply", 
+                ViewMode.TREE: f"/:Search f:Filter n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}",
+                ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.filter_mode else 
+                                "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"), 
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
             self.stdscr.addstr(height-1, 0, help_text[:width-1])
@@ -150,10 +157,64 @@ class TUI:
             elif result == "search_submitted":
                 self.search_overlay.deactivate()
                 self.current_view = ViewMode.TREE
-                if self.search_term:
-                    self.status_message = f"Search: '{self.search_term}' ({len(self.filtered_conversations)} matches)"
+                term = self.search_overlay.get_search_term()
+                if self.filter_mode:
+                    # Filter mode - update filtered conversations
+                    if term:
+                        self._update_search(term)
+                        self.status_message = f"Filter: '{term}' ({len(self.filtered_conversations)} matches)"
+                    else:
+                        self._clear_search()
+                else:
+                    # Search mode - find and jump to matches
+                    if term:
+                        self.search_term = term
+                        self.search_matches = self._find_search_matches(term)
+                        if self.search_matches:
+                            self._jump_to_match(0)  # Jump to first match
+                        else:
+                            self.status_message = f"No matches found for: {term}"
+                    else:
+                        self.search_matches = []
+                        self.current_match_index = -1
             elif result == "search_changed":
-                self._update_search(self.search_overlay.get_search_term())
+                term = self.search_overlay.get_search_term()
+                if self.filter_mode:
+                    # Filter mode - update filtered conversations as user types
+                    if term:
+                        self._update_search(term)
+                        # Don't show status message for every keystroke in filter mode
+                    else:
+                        self._clear_search()
+                else:
+                    # Incremental search - update matches and jump to first match as user types
+                    if term:
+                        self.search_term = term
+                        self.search_matches = self._find_search_matches(term)
+                        if self.search_matches:
+                            self._jump_to_match(0)  # Jump to first match immediately
+                        else:
+                            # Show no matches message but don't clear previous position
+                            self.status_message = f"No matches for: {term}"
+                    else:
+                        # Empty search - clear matches but don't jump anywhere
+                        self.search_matches = []
+                        self.current_match_index = -1
+            elif result == "search_next_match":
+                # Ctrl+G in search mode - go to next match without leaving search
+                if not self.filter_mode:  # Only works in search mode, not filter mode
+                    term = self.search_overlay.get_search_term()
+                    if term:
+                        self.search_term = term
+                        self.search_matches = self._find_search_matches(term)
+                        if self.search_matches:
+                            # If we have a current match, go to next, otherwise start at first
+                            if self.current_match_index >= 0:
+                                self._search_next()
+                            else:
+                                self._jump_to_match(0)
+                        else:
+                            self.status_message = f"No matches found for: {term}"
             return
             
         if self.current_view == ViewMode.DETAIL:
@@ -172,8 +233,7 @@ class TUI:
             else:
                 self.running = False
         elif key == ord('/'):
-            self.current_view = ViewMode.SEARCH
-            self.search_overlay.activate()
+            self._start_vim_search()
         elif key == 1:  # Ctrl+A
             self._select_all()
         elif key == ord(' '):  # Space for multi-select
@@ -185,7 +245,14 @@ class TUI:
             
     def _handle_tree_key(self, key: int) -> None:
         """Handle keys in tree view."""
+        # Store previous selection for visual mode
+        prev_selected = self.tree_view.selected
+        
         result = self.tree_view.handle_input(key)
+        
+        # Update visual mode selection if cursor moved
+        if self.visual_mode and self.tree_view.selected != prev_selected:
+            self._update_visual_selection()
         
         if result == "select":
             item = self.tree_view.get_selected()
@@ -271,6 +338,10 @@ class TUI:
             self._outdent_items()
         elif result == "quick_filter":
             self._quick_filter()
+        elif key == ord('n'):  # Next search match
+            self._search_next()
+        elif key == ord('N'):  # Previous search match
+            self._search_previous()
         elif result == "filter_folders":
             self._filter_folders()
         elif result == "filter_conversations":
@@ -435,7 +506,7 @@ class TUI:
             "  Shift+J/K  - Reorder up/down",
             "  o          - Toggle sort",
             "",
-            "Other: / (search), q (quit), ? (help)",
+            "Search: / (vim search), f (filter), n/N (next/prev),"
             "",
             "Press any key to close..."
         ]
@@ -643,6 +714,18 @@ class TUI:
                 self.status_message = f"Undid move operation"
             except Exception as e:
                 self.status_message = f"Undo failed: {e}"
+        elif action in ("indent", "outdent"):
+            # Undo indent/outdent: restore all items to original positions
+            original_positions = data
+            try:
+                for item_id, original_parent in original_positions:
+                    if item_id in self.tree.nodes:
+                        self.tree.move_node(item_id, original_parent)
+                self.tree.save()
+                self._refresh_tree()
+                self.status_message = f"Undid {action} operation"
+            except Exception as e:
+                self.status_message = f"Undo failed: {e}"
         elif action == "delete":
             # Undo delete: restore from data
             self.status_message = "Delete undo not implemented yet"
@@ -713,9 +796,9 @@ class TUI:
             # Enter visual mode
             self.visual_mode = True
             self.visual_start = self.tree_view.selected
-            item = self.tree_view.get_selected()
-            if item:
-                node, _, _ = item
+            # Start with current item selected
+            if self.visual_start < len(self.tree_items):
+                node, _, _ = self.tree_items[self.visual_start]
                 self.selected_items.add(node.id)
             self.status_message = "Visual mode activated - use arrows to select range"
         else:
@@ -723,6 +806,30 @@ class TUI:
             self.visual_mode = False
             self.visual_start = None
             self.status_message = f"Visual mode deactivated - {len(self.selected_items)} items selected"
+    
+    def _update_visual_selection(self) -> None:
+        """Update selection based on visual mode range."""
+        if not self.visual_mode or self.visual_start is None:
+            return
+            
+        # Clear previous selection and rebuild based on range
+        self.selected_items.clear()
+        
+        current_pos = self.tree_view.selected
+        start_pos = self.visual_start
+        
+        # Determine the range (inclusive)
+        min_pos = min(start_pos, current_pos)
+        max_pos = max(start_pos, current_pos)
+        
+        # Select all items in the range
+        for i in range(min_pos, max_pos + 1):
+            if i < len(self.tree_items):
+                node, _, _ = self.tree_items[i]
+                self.selected_items.add(node.id)
+                
+        # Update status to show selection size
+        self.status_message = f"Visual: {len(self.selected_items)} items selected"
     
     def _indent_items(self) -> None:
         """Indent selected items (move them into a sibling folder)."""
@@ -751,6 +858,16 @@ class TUI:
                 break
                 
         if target_folder:
+            # Save undo state before making changes
+            original_positions = []
+            for item_id in self.selected_items:
+                if item_id in self.tree.nodes:
+                    node = self.tree.nodes[item_id]
+                    original_positions.append((item_id, node.parent_id))
+            
+            if original_positions:
+                self._save_undo_state("indent", original_positions)
+            
             moved = 0
             for item_id in self.selected_items:
                 try:
@@ -775,6 +892,16 @@ class TUI:
             self.status_message = "No items selected to outdent"
             return
             
+        # Save undo state before making changes
+        original_positions = []
+        for item_id in self.selected_items:
+            if item_id in self.tree.nodes:
+                node = self.tree.nodes[item_id]
+                original_positions.append((item_id, node.parent_id))
+        
+        if original_positions:
+            self._save_undo_state("outdent", original_positions)
+            
         moved = 0
         for item_id in self.selected_items:
             node = self.tree.nodes.get(item_id)
@@ -796,10 +923,77 @@ class TUI:
             self.status_message = "Could not outdent items (already at top level?)"
     
     def _quick_filter(self) -> None:
-        """Start quick filter mode."""
+        """Start filter mode (filters the tree)."""
+        self.filter_mode = True
         self.current_view = ViewMode.SEARCH
         self.search_overlay.activate()
-        self.status_message = "Quick filter mode"
+        self.status_message = "Filter mode: type to filter conversations"
+    
+    def _start_vim_search(self) -> None:
+        """Start vim-style search that jumps to matches."""
+        self.filter_mode = False
+        self.current_view = ViewMode.SEARCH
+        self.search_overlay.activate()
+        self.status_message = "Incremental search: type to find and jump to matches"
+    
+    def _find_search_matches(self, term: str) -> List[int]:
+        """Find all tree items that match the search term."""
+        if not term:
+            return []
+            
+        matches = []
+        term_lower = term.lower()
+        
+        for i, (node, conv, _) in enumerate(self.tree_items):
+            # Search in node name
+            if term_lower in node.name.lower():
+                matches.append(i)
+                continue
+                
+            # Search in conversation title and content
+            if conv:
+                if term_lower in conv.title.lower():
+                    matches.append(i)
+                    continue
+                    
+                # Search in message content
+                for message in conv.messages:
+                    if term_lower in message.content.lower():
+                        matches.append(i)
+                        break
+                        
+        return matches
+    
+    def _jump_to_match(self, match_index: int) -> None:
+        """Jump to a specific search match."""
+        if 0 <= match_index < len(self.search_matches):
+            tree_index = self.search_matches[match_index]
+            if tree_index < len(self.tree_items):
+                self.tree_view.selected = tree_index
+                self.tree_view._ensure_visible()
+                self.current_match_index = match_index
+                
+                # Show match info
+                total_matches = len(self.search_matches)
+                self.status_message = f"Match {match_index + 1}/{total_matches}: {self.search_term}"
+    
+    def _search_next(self) -> None:
+        """Jump to next search match."""
+        if not self.search_matches:
+            self.status_message = "No search results. Use / to search."
+            return
+            
+        next_index = (self.current_match_index + 1) % len(self.search_matches)
+        self._jump_to_match(next_index)
+    
+    def _search_previous(self) -> None:
+        """Jump to previous search match."""
+        if not self.search_matches:
+            self.status_message = "No search results. Use / to search."
+            return
+            
+        prev_index = (self.current_match_index - 1) % len(self.search_matches)
+        self._jump_to_match(prev_index)
     
     def _filter_folders(self) -> None:
         """Show only folders."""
