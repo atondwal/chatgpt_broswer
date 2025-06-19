@@ -167,7 +167,9 @@ class TUI:
         while self.running:
             try:
                 self._draw()
-                key = stdscr.getch()
+                # Use enhanced key reading for better function key support
+                from src.tui.key_mapper import get_key_with_escape_handling
+                key = get_key_with_escape_handling(stdscr)
                 self._handle_key(key)
             except KeyboardInterrupt:
                 break

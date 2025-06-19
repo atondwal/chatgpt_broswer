@@ -135,6 +135,8 @@ class TreeView:
             return "help"
         elif key == curses.KEY_F2:  # F2 - Rename
             return "rename"
+        elif key == curses.KEY_F3:  # F3 - Search
+            return "quick_filter"
         elif key == curses.KEY_F5:  # F5 - Refresh
             return "refresh"
         elif key == curses.KEY_DC:  # Delete key
