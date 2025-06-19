@@ -31,28 +31,22 @@ A simple, fast tool for browsing and organizing your ChatGPT conversation histor
 git clone https://github.com/your-username/chatgpt_browser.git
 cd chatgpt_browser
 
-# Option 1: Use directly with Python
+# Option 1: Use directly with Python (no installation needed)
 python scripts/cgpt-tui.py conversations.json
 
-# Option 2: Install in development mode
+# Option 2: Install for convenient access from anywhere
 pip install -e .
 cgpt-tui conversations.json
-
-# Option 3: Use make commands
-make run  # Runs the TUI with conversations.json
 ```
 
 ### Running the TUI
 
 ```bash
-# Direct execution
+# Direct execution (no installation needed)
 python scripts/cgpt-tui.py conversations.json
 
 # After installation
 cgpt-tui conversations.json
-
-# Using make
-make run
 ```
 
 ### Running the CLI
@@ -138,10 +132,11 @@ chatgpt_browser/
 │   ├── tui/             # Terminal UI components
 │   └── cli/             # Command line interface
 ├── tests/               # Test files
-├── docs/                # Documentation
+├── docs/                # Additional documentation
 ├── data/samples/        # Sample data files
-├── Makefile            # Development commands
 ├── pyproject.toml      # Python package configuration
+├── pytest.ini          # Test configuration
+├── conftest.py         # Test setup
 └── README.md           # This file
 ```
 
@@ -193,24 +188,25 @@ def load_conversations(file_path: str) -> List[Conversation]:
 
 ## 🛠️ Development
 
-### Make Commands
-
-```bash
-make help       # Show available commands
-make install    # Install in development mode
-make test       # Run all tests
-make clean      # Clean cache and temp files
-make run        # Run the TUI with conversations.json
-```
-
 ### Testing
 
 ```bash
 # Run all tests
-make test
+pytest tests/ -v
 
 # Run specific test file
 pytest tests/test_simple.py -v
+
+# Run with coverage
+pytest tests/ --cov=src --cov-report=term-missing
+```
+
+### Cleaning Up
+
+```bash
+# Remove Python cache files
+find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -delete 2>/dev/null || true
 ```
 
 The tests are also self-documenting:
