@@ -46,11 +46,3 @@ class Conversation:
     create_time: Optional[float] = None
     update_time: Optional[float] = None
     metadata: Optional[Dict[str, Any]] = None
-
-    @property
-    def message_count(self) -> int:
-        return len(self.messages)
-
-    @property
-    def has_messages(self) -> bool:
-        return len(self.messages) > 0

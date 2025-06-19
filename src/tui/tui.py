@@ -68,66 +68,6 @@ class TUI:
         # Action handlers list (will be populated in run())
         self.action_handlers = []
         
-    @property
-    def selected_items(self):
-        """Get selected items from selection manager."""
-        return self.selection_manager.selected_items
-        
-    @selected_items.setter
-    def selected_items(self, value):
-        """Set selected items in selection manager."""
-        self.selection_manager.selected_items = value
-        
-    @property
-    def visual_mode(self):
-        """Get visual mode state from selection manager."""
-        return self.selection_manager.visual_mode
-        
-    @property
-    def visual_start(self):
-        """Get visual start position from selection manager."""
-        return self.selection_manager.visual_start
-        
-    @property
-    def search_matches(self):
-        """Get search matches from search manager."""
-        return self.search_manager.search_matches
-        
-    @search_matches.setter
-    def search_matches(self, value):
-        """Set search matches in search manager."""
-        self.search_manager.search_matches = value
-        
-    @property
-    def current_match_index(self):
-        """Get current match index from search manager."""
-        return self.search_manager.current_match_index
-        
-    @current_match_index.setter  
-    def current_match_index(self, value):
-        """Set current match index in search manager."""
-        self.search_manager.current_match_index = value
-        
-    @property
-    def filter_mode(self):
-        """Get filter mode from search manager."""
-        return self.search_manager.filter_mode
-        
-    @filter_mode.setter
-    def filter_mode(self, value):
-        """Set filter mode in search manager."""
-        self.search_manager.filter_mode = value
-        
-    @property
-    def undo_stack(self):
-        """Get undo stack from action manager."""
-        return self.action_manager.undo_stack
-        
-    @property
-    def last_action(self):
-        """Get last action from action manager."""
-        return self.action_manager.last_action
-        
     def run(self, stdscr) -> None:
         """Main UI loop."""
         self.stdscr = stdscr
@@ -140,9 +80,9 @@ class TUI:
         curses.init_pair(3, curses.COLOR_YELLOW, -1)                 # Folder
         
         # Initialize components
+        self.detail_view = DetailView(stdscr)
+        self.tree_view = TreeView(stdscr)
         height, width = stdscr.getmaxyx()
-        self.detail_view = DetailView(stdscr, 1, 0, width, height - 2)
-        self.tree_view = TreeView(stdscr, 1, 0, width, height - 2)
         self.search_overlay = SearchOverlay(stdscr, 0, 0, width)
         self.operations_manager = OperationsManager(self.tree, stdscr)
         self.tree_manager = TreeManager(self.tree, self)
@@ -199,13 +139,13 @@ class TUI:
             self.status_message = ""
         else:
             # Show help
-            multi_info = f" [{len(self.selected_items)} selected]" if self.selected_items else ""
-            visual_info = " [VISUAL]" if self.visual_mode else ""
-            search_info = f" [{len(self.search_matches)} matches]" if self.search_matches else ""
+            multi_info = f" [{len(self.selection_manager.selected_items)} selected]" if self.selection_manager.selected_items else ""
+            visual_info = " [VISUAL]" if self.selection_manager.visual_mode else ""
+            search_info = f" [{len(self.search_manager.search_matches)} matches]" if self.search_manager.search_matches else ""
             filter_info = f" [{len(self.filtered_conversations)} filtered]" if len(self.filtered_conversations) != len(self.conversations) else ""
             help_text = {
                 ViewMode.TREE: f"/:Search f:Filter n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}",
-                ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.filter_mode else 
+                ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.search_manager.filter_mode else 
                                 "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"), 
                 ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
@@ -215,7 +155,7 @@ class TUI:
             
     def _draw_tree(self) -> None:
         """Draw tree view."""
-        self.tree_view.set_selected_items(self.selected_items)
+        self.tree_view.set_selected_items(self.selection_manager.selected_items)
         self.tree_view.draw()
             
     def _handle_key(self, key: int) -> None:
@@ -243,8 +183,8 @@ class TUI:
                     # Search mode - find and jump to matches
                     if term:
                         self.search_term = term
-                        self.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
-                        if self.search_matches:
+                        self.search_manager.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
+                        if self.search_manager.search_matches:
                             tree_index, status = self.search_manager.jump_to_match(0)
                             if tree_index is not None and tree_index < len(self.tree_items):
                                 self.tree_view.selected = tree_index
@@ -253,8 +193,8 @@ class TUI:
                         else:
                             self.status_message = f"No matches found for: {term}"
                     else:
-                        self.search_matches = []
-                        self.current_match_index = -1
+                        self.search_manager.search_matches = []
+                        self.search_manager.current_match_index = -1
             elif result == "search_changed":
                 term = self.search_overlay.get_search_term()
                 if self.search_manager.is_filter_mode():
@@ -268,8 +208,8 @@ class TUI:
                     # Incremental search - update matches and jump to first match as user types
                     if term:
                         self.search_term = term
-                        self.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
-                        if self.search_matches:
+                        self.search_manager.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
+                        if self.search_manager.search_matches:
                             tree_index, status = self.search_manager.jump_to_match(0)
                             if tree_index is not None and tree_index < len(self.tree_items):
                                 self.tree_view.selected = tree_index
@@ -280,18 +220,18 @@ class TUI:
                             self.status_message = f"No matches for: {term}"
                     else:
                         # Empty search - clear matches but don't jump anywhere
-                        self.search_matches = []
-                        self.current_match_index = -1
+                        self.search_manager.search_matches = []
+                        self.search_manager.current_match_index = -1
             elif result == "search_next_match":
                 # Ctrl+G in search mode - go to next match without leaving search
                 if not self.search_manager.is_filter_mode():  # Only works in search mode, not filter mode
                     term = self.search_overlay.get_search_term()
                     if term:
                         self.search_term = term
-                        self.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
-                        if self.search_matches:
+                        self.search_manager.search_matches = self.search_manager.find_search_matches(term, self.tree_items)
+                        if self.search_manager.search_matches:
                             # If we have a current match, go to next, otherwise start at first
-                            if self.current_match_index >= 0:
+                            if self.search_manager.current_match_index >= 0:
                                 tree_index, status = self.search_manager.search_next()
                                 if tree_index is not None:
                                     self.tree_view.selected = tree_index
@@ -317,7 +257,7 @@ class TUI:
         if key == ord('q'):
             self.running = False
         elif key == 27:  # ESC - clear selection if in multi-select mode, otherwise quit
-            if self.selected_items:
+            if self.selection_manager.selected_items:
                 self.status_message = self.selection_manager.clear_selection()
             else:
                 self.running = False
@@ -344,7 +284,7 @@ class TUI:
         result = self.tree_view.handle_input(key)
         
         # Update visual mode selection if cursor moved
-        if self.visual_mode and self.tree_view.selected != prev_selected:
+        if self.selection_manager.visual_mode and self.tree_view.selected != prev_selected:
             self.status_message = self.selection_manager.update_visual_selection(
                 self.tree_view.selected, self.tree_items
             )

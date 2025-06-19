@@ -144,7 +144,8 @@ class TestTreeView:
     def setup_method(self):
         """Set up test tree view."""
         self.mock_stdscr = Mock()
-        self.tree_view = TreeView(self.mock_stdscr, 1, 0, 80, 24)
+        self.mock_stdscr.getmaxyx.return_value = (24, 80)
+        self.tree_view = TreeView(self.mock_stdscr)
         
         # Create test tree items
         self.test_nodes = [
@@ -525,7 +526,7 @@ class TestTUIEnhancements:
         assert "No items selected to outdent" in result.message
         
         # With items selected but no current item (should fail gracefully)
-        self.tui.selected_items = {"1", "2"}
+        self.tui.selection_manager.selected_items = {"1", "2"}
         self.tui.tree_view.get_selected = Mock(return_value=None)
         context = ActionContext(self.tui, 9, "indent")
         result = self.tui.operations_manager.handle("indent", context)
@@ -548,7 +549,7 @@ class TestTUIEnhancements:
         self.tui._quick_filter()
         
         assert self.tui.current_view == ViewMode.SEARCH
-        assert self.tui.filter_mode == True
+        assert self.tui.search_manager.filter_mode == True
         assert "Filter mode" in self.tui.status_message
     
     def test_indent_outdent_undo(self):
@@ -559,7 +560,7 @@ class TestTUIEnhancements:
         self.tui.tree.add_conversation(conv_id, "Test Conversation")
         
         # Set up selection
-        self.tui.selected_items = {conv_id}
+        self.tui.selection_manager.selected_items = {conv_id}
         mock_item = (self.tui.tree.nodes[conv_id], Mock(title="Test"), 0)
         self.tui.tree_view.get_selected = Mock(return_value=mock_item)
         
@@ -585,7 +586,7 @@ class TestTUIEnhancements:
         # Test outdent with undo
         # First move item to folder
         self.tui.tree.move_node(conv_id, folder_id)
-        self.tui.selected_items = {conv_id}
+        self.tui.selection_manager.selected_items = {conv_id}
         
         # Outdent
         context = ActionContext(self.tui, 353, "outdent")
@@ -614,7 +615,7 @@ class TestTUIEnhancements:
         self.tui.tree.add_conversation(conv_id2, "Conv 2")
         
         # Select multiple items
-        self.tui.selected_items = {conv_id1, conv_id2}
+        self.tui.selection_manager.selected_items = {conv_id1, conv_id2}
         mock_item = (self.tui.tree.nodes[conv_id1], Mock(title="Conv 1"), 0)
         self.tui.tree_view.get_selected = Mock(return_value=mock_item)
         
@@ -652,13 +653,13 @@ class TestTUIEnhancements:
         assert len(matches) >= 2  # Should find at least 2 matches
         
         # Test jumping to matches
-        self.tui.search_matches = matches
+        self.tui.search_manager.search_matches = matches
         tree_index, status = self.tui.search_manager.jump_to_match(0)
         if tree_index is not None:
             self.tui.tree_view.selected = tree_index
             self.tui.tree_view._ensure_visible()
         self.tui.status_message = status
-        assert self.tui.current_match_index == 0
+        assert self.tui.search_manager.current_match_index == 0
         assert "Match 1/" in self.tui.status_message
         
         # Test next/previous navigation
@@ -667,7 +668,7 @@ class TestTUIEnhancements:
             self.tui.tree_view.selected = tree_index
             self.tui.tree_view._ensure_visible()
         self.tui.status_message = status
-        assert self.tui.current_match_index == 1
+        assert self.tui.search_manager.current_match_index == 1
         assert "Match 2/" in self.tui.status_message
         
         tree_index, status = self.tui.search_manager.search_previous()
@@ -675,7 +676,7 @@ class TestTUIEnhancements:
             self.tui.tree_view.selected = tree_index
             self.tui.tree_view._ensure_visible()
         self.tui.status_message = status
-        assert self.tui.current_match_index == 0
+        assert self.tui.search_manager.current_match_index == 0
         
         # Test wraparound
         tree_index, status = self.tui.search_manager.search_previous()
@@ -683,10 +684,10 @@ class TestTUIEnhancements:
             self.tui.tree_view.selected = tree_index
             self.tui.tree_view._ensure_visible()
         self.tui.status_message = status
-        assert self.tui.current_match_index == len(matches) - 1  # Should wrap to last
+        assert self.tui.search_manager.current_match_index == len(matches) - 1  # Should wrap to last
         
         # Test with no matches
-        self.tui.search_matches = []
+        self.tui.search_manager.search_matches = []
         tree_index, status = self.tui.search_manager.search_next()
         if tree_index is not None:
             self.tui.tree_view.selected = tree_index
@@ -804,9 +805,9 @@ class TestTUIEnhancements:
         # Manually call the search_changed logic
         term = "t"
         self.tui.search_term = term
-        self.tui.search_matches = self.tui.search_manager.find_search_matches(term, self.tui.tree_items)
+        self.tui.search_manager.search_matches = self.tui.search_manager.find_search_matches(term, self.tui.tree_items)
         original_selection = self.tui.tree_view.selected
-        if self.tui.search_matches:
+        if self.tui.search_manager.search_matches:
             tree_index, status = self.tui.search_manager.jump_to_match(0)
             if tree_index is not None:
                 self.tui.tree_view.selected = tree_index
@@ -814,41 +815,41 @@ class TestTUIEnhancements:
             self.tui.status_message = status
         
         # Should have found matches and jumped to first one
-        assert len(self.tui.search_matches) >= 2  # "Testing" and "Another Test"
-        assert self.tui.current_match_index == 0
+        assert len(self.tui.search_manager.search_matches) >= 2  # "Testing" and "Another Test"
+        assert self.tui.search_manager.current_match_index == 0
         
         # Type "te" - should still find matches but maybe fewer
         term = "te"
         self.tui.search_term = term  
-        self.tui.search_matches = self.tui.search_manager.find_search_matches(term, self.tui.tree_items)
-        if self.tui.search_matches:
+        self.tui.search_manager.search_matches = self.tui.search_manager.find_search_matches(term, self.tui.tree_items)
+        if self.tui.search_manager.search_matches:
             tree_index, status = self.tui.search_manager.jump_to_match(0)
             if tree_index is not None:
                 self.tui.tree_view.selected = tree_index
                 self.tui.tree_view._ensure_visible()
             self.tui.status_message = status
         
-        assert len(self.tui.search_matches) >= 2  # "Testing" and "Test"
-        assert self.tui.current_match_index == 0
+        assert len(self.tui.search_manager.search_matches) >= 2  # "Testing" and "Test"
+        assert self.tui.search_manager.current_match_index == 0
         
         # Type "tes" - should still find both test-related items
         term = "tes"
         self.tui.search_term = term
-        self.tui.search_matches = self.tui.search_manager.find_search_matches(term, self.tui.tree_items)
-        if self.tui.search_matches:
+        self.tui.search_manager.search_matches = self.tui.search_manager.find_search_matches(term, self.tui.tree_items)
+        if self.tui.search_manager.search_matches:
             tree_index, status = self.tui.search_manager.jump_to_match(0)
             if tree_index is not None:
                 self.tui.tree_view.selected = tree_index
                 self.tui.tree_view._ensure_visible()
             self.tui.status_message = status
             
-        assert len(self.tui.search_matches) >= 2
-        assert self.tui.current_match_index == 0
+        assert len(self.tui.search_manager.search_matches) >= 2
+        assert self.tui.search_manager.current_match_index == 0
     
     def test_visual_mode_selection(self):
         """Test that visual mode properly selects ranges."""
         # Clear existing items and create fresh test data
-        self.tui.selected_items.clear()
+        self.tui.selection_manager.selected_items.clear()
         
         # We already have some conversations from setup, let's use them
         self.tui._refresh_tree()
@@ -863,9 +864,9 @@ class TestTUIEnhancements:
         self.tui.status_message = self.tui.selection_manager.toggle_visual_mode(
             self.tui.tree_view.selected, self.tui.tree_items
         )
-        assert self.tui.visual_mode == True
-        assert self.tui.visual_start == 0
-        assert len(self.tui.selected_items) == 1  # Should select current item
+        assert self.tui.selection_manager.visual_mode == True
+        assert self.tui.selection_manager.visual_start == 0
+        assert len(self.tui.selection_manager.selected_items) == 1  # Should select current item
         
         # Move down to position 1 (should select items 0, 1)
         self.tui.tree_view.selected = 1
@@ -873,7 +874,7 @@ class TestTUIEnhancements:
             self.tui.tree_view.selected, self.tui.tree_items
         )
         
-        assert len(self.tui.selected_items) == 2  # Items 0, 1
+        assert len(self.tui.selection_manager.selected_items) == 2  # Items 0, 1
         assert "Visual: 2 items selected" in self.tui.status_message
         
         # Move back to position 0 (should select just item 0)
@@ -882,18 +883,18 @@ class TestTUIEnhancements:
             self.tui.tree_view.selected, self.tui.tree_items
         )
         
-        assert len(self.tui.selected_items) == 1  # Just item 0
+        assert len(self.tui.selection_manager.selected_items) == 1  # Just item 0
         assert "Visual: 1 items selected" in self.tui.status_message
             
         # Exit visual mode
         self.tui.status_message = self.tui.selection_manager.toggle_visual_mode(
             self.tui.tree_view.selected, self.tui.tree_items
         )
-        assert self.tui.visual_mode == False
-        assert self.tui.visual_start is None
+        assert self.tui.selection_manager.visual_mode == False
+        assert self.tui.selection_manager.visual_start is None
         assert "Visual mode deactivated" in self.tui.status_message
         # Selection should be preserved  
-        assert len(self.tui.selected_items) == 1
+        assert len(self.tui.selection_manager.selected_items) == 1
     
     def test_filter_vs_search_modes(self):
         """Test that f activates filter mode and / activates search mode."""
@@ -914,7 +915,7 @@ class TestTUIEnhancements:
         
         # Test filter mode (f key)
         self.tui._quick_filter()
-        assert self.tui.filter_mode == True
+        assert self.tui.search_manager.filter_mode == True
         assert self.tui.current_view.value == "search"
         assert "Filter mode" in self.tui.status_message
         
@@ -924,7 +925,7 @@ class TestTUIEnhancements:
         self.tui.search_overlay = overlay
         
         # Simulate filter submission
-        self.tui.filter_mode = True  # Ensure we're in filter mode
+        self.tui.search_manager.filter_mode = True  # Ensure we're in filter mode
         term = "python"
         self.tui._update_search(term)
         
@@ -940,7 +941,7 @@ class TestTUIEnhancements:
         
         # Test search mode (/ key)
         self.tui._start_vim_search()
-        assert self.tui.filter_mode == False
+        assert self.tui.search_manager.filter_mode == False
         assert self.tui.current_view.value == "search"
         assert "Incremental search" in self.tui.status_message
         
@@ -962,7 +963,7 @@ class TestTUIEnhancements:
         self.tui._refresh_tree()
         
         # Select two items
-        self.tui.selected_items = {conv_id1, conv_id2}
+        self.tui.selection_manager.selected_items = {conv_id1, conv_id2}
         original_parent1 = self.tui.tree.nodes[conv_id1].parent_id
         original_parent2 = self.tui.tree.nodes[conv_id2].parent_id
         
@@ -992,7 +993,7 @@ class TestTUIEnhancements:
         assert self.tui.tree.nodes[conv_id3].parent_id != folder_id
         
         # Check that selection was cleared
-        assert len(self.tui.selected_items) == 0
+        assert len(self.tui.selection_manager.selected_items) == 0
         
         # Check status message
         assert result is not None
@@ -1000,7 +1001,7 @@ class TestTUIEnhancements:
     
     def test_create_folder_without_selection(self):
         """Test that creating a folder without selection works normally."""
-        self.tui.selected_items.clear()
+        self.tui.selection_manager.selected_items.clear()
         
         # Mock the input for folder name and stdscr
         from unittest.mock import patch, Mock
@@ -1030,7 +1031,7 @@ class TestTUIEnhancements:
         self.tui._refresh_tree()
         
         # Clear selection to test single item behavior
-        self.tui.selected_items.clear()
+        self.tui.selection_manager.selected_items.clear()
         
         # Mock current item
         mock_item = (self.tui.tree.nodes[conv1_id], Mock(title="Conversation 1"), 0)

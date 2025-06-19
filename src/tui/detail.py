@@ -10,12 +10,14 @@ from src.core.models import Conversation, MessageRole
 class DetailView:
     """Scrollable conversation viewer."""
     
-    def __init__(self, stdscr, y: int, x: int, width: int, height: int):
+    def __init__(self, stdscr):
         self.stdscr = stdscr
-        self.y = y
-        self.x = x
-        self.width = width
-        self.height = height
+        # Use almost full screen, leaving room for status line
+        h, w = stdscr.getmaxyx()
+        self.y = 1
+        self.x = 0
+        self.width = w
+        self.height = h - 2
         
         self.conversation: Optional[Conversation] = None
         self.scroll_offset = 0

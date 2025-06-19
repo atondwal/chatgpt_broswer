@@ -3,19 +3,20 @@
 
 import json
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 
+@dataclass
 class TreeNode:
     """A node in the tree - either a folder or conversation."""
-    def __init__(self, id: str, name: str, is_folder: bool, parent_id: Optional[str] = None):
-        self.id = id
-        self.name = name
-        self.is_folder = is_folder
-        self.parent_id = parent_id
-        self.children: Set[str] = set()
-        self.expanded = True
+    id: str
+    name: str
+    is_folder: bool
+    parent_id: Optional[str] = None
+    children: Set[str] = field(default_factory=set)
+    expanded: bool = True
 
 
 class ConversationTree:

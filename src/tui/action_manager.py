@@ -44,22 +44,6 @@ class ActionManager(ActionHandler):
         """
         return self.last_action
         
-    def has_undo_actions(self) -> bool:
-        """Check if there are actions available to undo."""
-        return len(self.undo_stack) > 0
-        
-    def has_last_action(self) -> bool:
-        """Check if there's a last action available to repeat."""
-        return self.last_action is not None
-        
-    def clear_undo_stack(self) -> None:
-        """Clear the undo stack."""
-        self.undo_stack.clear()
-        
-    def get_undo_count(self) -> int:
-        """Get the number of actions in the undo stack."""
-        return len(self.undo_stack)
-        
     # ActionHandler implementation
     def can_handle(self, action: str) -> bool:
         """Check if this handler can process the action."""

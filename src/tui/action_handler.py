@@ -2,58 +2,41 @@
 """Base classes for action handling in the TUI."""
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from dataclasses import dataclass, field
 from typing import Optional, Any, Tuple
 
 
+@dataclass
 class ActionContext:
     """Context information passed to action handlers."""
+    tui: Any
+    key: int
+    result: str
+    tree_view: Any = field(init=False)
+    selected_item: Any = field(init=False)
+    selected_items: set = field(init=False)
+    tree_items: list = field(init=False)
+    tree: Any = field(init=False)
+    stdscr: Any = field(init=False)
     
-    def __init__(self, tui, key: int, result: str):
-        """Initialize action context.
-        
-        Args:
-            tui: The TUI instance
-            key: The key that was pressed
-            result: The result from tree_view.handle_input()
-        """
-        self.tui = tui
-        self.key = key
-        self.result = result
-        self.tree_view = tui.tree_view
-        self.selected_item = tui.tree_view.get_selected()
-        self.selected_items = tui.selected_items
-        self.tree_items = tui.tree_items
-        self.tree = tui.tree
-        self.stdscr = getattr(tui, 'stdscr', None)
-        
-        
+    def __post_init__(self):
+        self.tree_view = self.tui.tree_view
+        self.selected_item = self.tui.tree_view.get_selected()
+        self.selected_items = self.tui.selection_manager.selected_items
+        self.tree_items = self.tui.tree_items
+        self.tree = self.tui.tree
+        self.stdscr = getattr(self.tui, 'stdscr', None)
+
+
+@dataclass
 class ActionResult:
     """Result returned by action handlers."""
-    
-    def __init__(self, 
-                 success: bool,
-                 message: str = "",
-                 refresh_tree: bool = False,
-                 save_tree: bool = False,
-                 change_view: Optional[Any] = None,
-                 clear_selection: bool = False):
-        """Initialize action result.
-        
-        Args:
-            success: Whether the action succeeded
-            message: Status message to display
-            refresh_tree: Whether to refresh the tree view
-            save_tree: Whether to save the tree
-            change_view: New view mode to switch to
-            clear_selection: Whether to clear selection
-        """
-        self.success = success
-        self.message = message
-        self.refresh_tree = refresh_tree
-        self.save_tree = save_tree
-        self.change_view = change_view
-        self.clear_selection = clear_selection
+    success: bool
+    message: str = ""
+    refresh_tree: bool = False
+    save_tree: bool = False
+    change_view: Optional[Any] = None
+    clear_selection: bool = False
         
 
 class ActionHandler(ABC):

@@ -10,12 +10,14 @@ from src.tree.tree import TreeNode
 class TreeView:
     """Tree view with excellent visual hierarchy and interactions."""
     
-    def __init__(self, stdscr, y: int, x: int, width: int, height: int):
+    def __init__(self, stdscr):
         self.stdscr = stdscr
-        self.y = y
-        self.x = x
-        self.width = width
-        self.height = height
+        # Use almost full screen, leaving room for status line
+        h, w = stdscr.getmaxyx()
+        self.y = 1
+        self.x = 0
+        self.width = w
+        self.height = h - 2
         
         # Visual settings
         self.indent_size = 2
