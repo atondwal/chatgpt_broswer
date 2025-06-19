@@ -25,7 +25,7 @@ test:
 # Run the TUI
 run:
 	@echo "🚀 Starting ChatGPT Browser..."
-	@python cgpt-tui.py conversations.json
+	@python scripts/cgpt-tui.py conversations.json
 
 # Clean cache and temporary files
 clean:

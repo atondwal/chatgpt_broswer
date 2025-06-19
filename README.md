@@ -24,26 +24,49 @@ A simple, fast tool for browsing and organizing your ChatGPT conversation histor
 3. Click **Export data** and download the zip file
 4. Extract `conversations.json` from the zip
 
-### Run the TUI
+### Installation
 
 ```bash
-# Clone and run
+# Clone the repository
 git clone https://github.com/your-username/chatgpt_browser.git
 cd chatgpt_browser
-./cgpt-tui.py conversations.json
+
+# Option 1: Use directly with Python
+python scripts/cgpt-tui.py conversations.json
+
+# Option 2: Install in development mode
+pip install -e .
+cgpt-tui conversations.json
+
+# Option 3: Use make commands
+make run  # Runs the TUI with conversations.json
 ```
 
-### Run the CLI
+### Running the TUI
 
 ```bash
-# List conversations
-./cgpt.py conversations.json list
+# Direct execution
+python scripts/cgpt-tui.py conversations.json
 
-# Search
-./cgpt.py conversations.json search "python"
+# After installation
+cgpt-tui conversations.json
 
-# Export a conversation
-./cgpt.py conversations.json export 1
+# Using make
+make run
+```
+
+### Running the CLI
+
+```bash
+# Direct execution
+python scripts/cgpt.py conversations.json list
+python scripts/cgpt.py conversations.json search "python"
+python scripts/cgpt.py conversations.json export 1
+
+# After installation
+cgpt conversations.json list
+cgpt conversations.json search "python"
+cgpt conversations.json export 1
 ```
 
 ## 🎮 TUI Controls
@@ -102,23 +125,24 @@ The tree view provides an excellent user experience with:
 
 This codebase demonstrates **self-documenting code** principles. The code is simple, direct, and tells its own story without excessive comments or documentation.
 
-### The Simplified Structure
+### Project Structure
 
 ```
-src/
-├── core/
-│   ├── models.py           # Data structures
-│   └── simple_loader.py    # Load conversations (179 lines)
-├── tree/
-│   └── simple_tree.py      # Folder organization (205 lines)
-├── tui/
-│   ├── enhanced_tui.py     # Main TUI app (450 lines)
-│   ├── enhanced_tree_ux.py # Tree view with excellent UX (230 lines)
-│   ├── simple_detail.py    # Conversation viewer (119 lines)
-│   ├── simple_search.py    # Search interface (109 lines)
-│   └── simple_input.py     # Input dialogs (161 lines)
-└── cli/
-    └── simple_cli.py       # Command line interface (126 lines)
+chatgpt_browser/
+├── scripts/              # Entry point scripts
+│   ├── cgpt.py          # CLI entry point
+│   └── cgpt-tui.py      # TUI entry point
+├── src/                 # Source code
+│   ├── core/            # Core data models and loading
+│   ├── tree/            # Tree organization logic
+│   ├── tui/             # Terminal UI components
+│   └── cli/             # Command line interface
+├── tests/               # Test files
+├── docs/                # Documentation
+├── data/samples/        # Sample data files
+├── Makefile            # Development commands
+├── pyproject.toml      # Python package configuration
+└── README.md           # This file
 ```
 
 ### Code That Tells Its Own Story
@@ -167,10 +191,25 @@ def load_conversations(file_path: str) -> List[Conversation]:
 - **No Base Classes**: Zero abstract interfaces
 - **No Complex Inheritance**: Direct, simple classes
 
-## 🧪 Testing
+## 🛠️ Development
+
+### Make Commands
 
 ```bash
-# Run tests
+make help       # Show available commands
+make install    # Install in development mode
+make test       # Run all tests
+make clean      # Clean cache and temp files
+make run        # Run the TUI with conversations.json
+```
+
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run specific test file
 pytest tests/test_simple.py -v
 ```
 
