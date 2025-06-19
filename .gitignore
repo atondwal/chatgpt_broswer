@@ -68,7 +68,6 @@ Thumbs.db
 *.temp
 *.log
 temp_*
-test_*
 demo_*
 quick_*
 sample_*
