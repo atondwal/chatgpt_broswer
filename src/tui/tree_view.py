@@ -87,10 +87,14 @@ class TreeView:
             self.move_down(self.height // 2)
         elif key == 21:  # Ctrl+U  
             self.move_up(self.height // 2)
-        elif key == 6:  # Ctrl+F
-            self.move_down(self.height - 1)
+        elif key == 6:  # Ctrl+F - FZF fuzzy search
+            return "fzf_search"
         elif key == 2:  # Ctrl+B
             self.move_up(self.height - 1)
+        elif key == 16:  # Ctrl+P - Page up (alternative to Ctrl+B)
+            self.move_up(self.height - 1)
+        elif key == 14:  # Ctrl+N - Page down (alternative to Ctrl+F)
+            self.move_down(self.height - 1)
         elif key == ord('H'):  # Jump to top of screen
             self.selected = self.offset
             self._ensure_visible()

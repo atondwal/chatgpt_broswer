@@ -20,6 +20,7 @@ from src.tui.search_manager import SearchManager
 from src.tui.operations_manager import OperationsManager
 from src.tui.action_manager import ActionManager
 from src.tui.tree_manager import TreeManager
+from src.tui.fzf_search import FZFSearch
 from src.tui.action_handler import ActionContext, ActionResult
 
 
@@ -62,6 +63,7 @@ class TUI:
         self.selection_manager = SelectionManager()
         self.search_manager = SearchManager()
         self.action_manager = ActionManager()
+        self.fzf_search = FZFSearch()
         # Note: operations_manager and tree_manager need stdscr/tui, so we'll initialize them in run()
         
         # Action handlers list (will be populated in run())
@@ -139,7 +141,7 @@ class TUI:
             search_info = f" [{len(self.search_manager.search_matches)} matches]" if self.search_manager.search_matches else ""
             filter_info = f" [{len(self.filtered_conversations)} filtered]" if len(self.filtered_conversations) != len(self.conversations) else ""
             help_text = {
-                ViewMode.TREE: f"/:Search f:Filter n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}",
+                ViewMode.TREE: f"/:Search f:Filter Ctrl+F:FZF n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}",
                 ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.search_manager.filter_mode else 
                                 "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"), 
             }.get(self.current_view, "q:Quit")
@@ -316,6 +318,8 @@ class TUI:
         # Handle special cases that need UI interaction
         elif result == "quick_filter":
             self._quick_filter()
+        elif result == "fzf_search":
+            self._handle_fzf_search()
             
         # Legacy key handling for keys not converted to results yet
         elif not result:
@@ -447,6 +451,43 @@ class TUI:
         self.status_message = self.search_manager.start_search_mode()
         self.current_view = ViewMode.SEARCH
         self.search_overlay.activate()
+    
+    def _handle_fzf_search(self) -> None:
+        """Handle FZF fuzzy search."""
+        if not self.fzf_search.is_available():
+            self.status_message = self.fzf_search.get_installation_message()
+            return
+            
+        # Temporarily exit curses mode for FZF
+        curses.endwin()
+        
+        try:
+            # Launch FZF search for all items
+            selected_index = self.fzf_search.search_all_items(self.tree_items)
+            
+            if selected_index is not None:
+                # Jump to selected item
+                self.tree_view.selected = selected_index
+                self.tree_view._ensure_visible()
+                
+                # Get item info for status message
+                if selected_index < len(self.tree_items):
+                    node, conv, _ = self.tree_items[selected_index]
+                    if node.is_folder:
+                        self.status_message = f"Jumped to folder: {node.name}"
+                    else:
+                        title = conv.title if conv else node.name
+                        self.status_message = f"Jumped to: {title}"
+                else:
+                    self.status_message = "Invalid selection"
+            else:
+                self.status_message = "FZF search cancelled"
+                
+        except Exception as e:
+            self.status_message = f"FZF search error: {str(e)}"
+        finally:
+            # Restore curses mode
+            self.stdscr.refresh()
     
     
 
