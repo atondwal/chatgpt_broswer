@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Optional
 
 from src.core.loader import load_conversations
+from src.core.claude_loader import list_claude_projects
 
 
-def list_conversations(file_path: str, count: int = 20) -> None:
+def list_conversations(file_path: str, count: int = 20, format: str = "auto") -> None:
     """List recent conversations."""
-    conversations = load_conversations(file_path)
+    conversations = load_conversations(file_path, format=format)
     
     print(f"Found {len(conversations)} conversations")
     print("=" * 50)
@@ -20,9 +21,9 @@ def list_conversations(file_path: str, count: int = 20) -> None:
         print(f"{i+1}. {conv.title}")
 
 
-def export_conversation(file_path: str, number: int) -> None:
+def export_conversation(file_path: str, number: int, format: str = "auto") -> None:
     """Export a conversation to stdout."""
-    conversations = load_conversations(file_path)
+    conversations = load_conversations(file_path, format=format)
     
     if not conversations:
         print("No conversations found.")
@@ -45,9 +46,9 @@ def export_conversation(file_path: str, number: int) -> None:
         print(msg.content)
 
 
-def search_conversations(file_path: str, query: str, content: bool = False) -> None:
+def search_conversations(file_path: str, query: str, content: bool = False, format: str = "auto") -> None:
     """Search conversations by title or content."""
-    conversations = load_conversations(file_path)
+    conversations = load_conversations(file_path, format=format)
     query_lower = query.lower()
     
     results = []
@@ -72,10 +73,38 @@ def search_conversations(file_path: str, query: str, content: bool = False) -> N
         print(f"{i+1}. [{idx+1}] {conv.title} ({match_type} match)")
 
 
+def list_claude_projects_cmd() -> None:
+    """List all Claude projects."""
+    projects = list_claude_projects()
+    
+    if not projects:
+        print("No Claude projects found in ~/.claude/projects/")
+        return
+    
+    print(f"Found {len(projects)} Claude projects:")
+    print("=" * 60)
+    
+    for i, project in enumerate(projects, 1):
+        name = project['name']
+        count = project['conversation_count']
+        
+        # Format last modified time
+        if project['last_modified']:
+            from datetime import datetime
+            last_mod = datetime.fromtimestamp(project['last_modified']).strftime('%Y-%m-%d %H:%M')
+        else:
+            last_mod = "Unknown"
+        
+        print(f"{i}. {name} ({count} conversations, last: {last_mod})")
+    
+    print("\nUse: cgpt <project_path> list")
+    print("  or: cgpt ~/.claude/projects/<PROJECT_NAME> list")
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Browse ChatGPT conversation history",
+        description="Browse ChatGPT and Claude conversation history",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -84,11 +113,28 @@ def main():
         "conversations_file",
         nargs="?",
         default=str(Path.home() / ".chatgpt" / "conversations.json"),
-        help="Path to conversations.json file"
+        help="Path to conversations file (JSON/JSONL) or Claude project directory"
+    )
+    
+    # Format option
+    parser.add_argument(
+        "--format",
+        choices=["auto", "chatgpt", "claude"],
+        default="auto",
+        help="Conversation format (auto-detected by default)"
+    )
+    
+    # Claude project option
+    parser.add_argument(
+        "--claude-project",
+        help="Browse a specific Claude project by name"
     )
     
     # Commands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Projects command (for Claude)
+    projects_parser = subparsers.add_parser("projects", help="List Claude projects")
     
     # List command
     list_parser = subparsers.add_parser("list", help="List conversations")
@@ -106,6 +152,16 @@ def main():
     
     args = parser.parse_args()
     
+    # Handle Claude project shortcut
+    if args.claude_project:
+        args.conversations_file = str(Path.home() / ".claude" / "projects" / args.claude_project)
+        args.format = "claude"
+    
+    # Handle projects command
+    if args.command == "projects":
+        list_claude_projects_cmd()
+        return
+    
     # Check file exists
     if not Path(args.conversations_file).exists():
         print(f"Error: File not found: {args.conversations_file}")
@@ -113,14 +169,14 @@ def main():
     
     # Execute command
     if args.command == "list":
-        list_conversations(args.conversations_file, args.count)
+        list_conversations(args.conversations_file, args.count, format=args.format)
     elif args.command == "export":
-        export_conversation(args.conversations_file, args.number)
+        export_conversation(args.conversations_file, args.number, format=args.format)
     elif args.command == "search":
-        search_conversations(args.conversations_file, args.query, args.content)
+        search_conversations(args.conversations_file, args.query, args.content, format=args.format)
     else:
         # Default to list
-        list_conversations(args.conversations_file)
+        list_conversations(args.conversations_file, format=args.format)
 
 
 if __name__ == "__main__":

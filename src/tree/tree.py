@@ -24,7 +24,20 @@ class ConversationTree:
     
     def __init__(self, filename: str):
         self.filename = filename
-        self.org_filename = filename.replace('.json', '_organization.json')
+        
+        # Handle different file types for organization file
+        if filename.endswith('.json'):
+            self.org_filename = filename.replace('.json', '_organization.json')
+        elif filename.endswith('.jsonl'):
+            self.org_filename = filename.replace('.jsonl', '_organization.json')
+        else:
+            # For directories (Claude projects), put org file in the directory
+            import os
+            if os.path.isdir(filename):
+                self.org_filename = os.path.join(filename, '_organization.json')
+            else:
+                self.org_filename = filename + '_organization.json'
+        
         self.nodes: Dict[str, TreeNode] = {}  # All nodes (folders and conversations)
         self.root_nodes: Set[str] = set()      # Top-level node IDs
         self.metadata: Dict[str, dict] = {}    # Extra data for conversations

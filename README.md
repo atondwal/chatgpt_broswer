@@ -1,6 +1,6 @@
 # ChatGPT History Browser
 
-A simple, fast tool for browsing and organizing your ChatGPT conversation history with excellent UX.
+A simple, fast tool for browsing and organizing your ChatGPT and Claude conversation history with excellent UX.
 
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -24,6 +24,10 @@ A simple, fast tool for browsing and organizing your ChatGPT conversation histor
 3. Click **Export data** and download the zip file
 4. Extract `conversations.json` from the zip
 
+### Browse Claude Code History
+
+Claude Code automatically saves your conversations locally in `~/.claude/projects/`. No export needed!
+
 ### Installation
 
 ```bash
@@ -41,12 +45,25 @@ cgpt-tui conversations.json
 
 ### Running the TUI
 
+#### For ChatGPT History
 ```bash
 # Direct execution (no installation needed)
 python scripts/cgpt-tui.py conversations.json
 
 # After installation
 cgpt-tui conversations.json
+```
+
+#### For Claude Code History
+```bash
+# List available Claude projects
+python scripts/cgpt.py projects
+
+# Browse a specific Claude project
+python scripts/cgpt-tui.py ~/.claude/projects/<PROJECT_NAME>
+
+# Or use the shortcut
+python scripts/cgpt-tui.py --claude-project <PROJECT_NAME>
 ```
 
 ### Running the CLI

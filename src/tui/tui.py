@@ -33,7 +33,7 @@ class ViewMode(Enum):
 class TUI:
     """Terminal interface for browsing ChatGPT conversations."""
     
-    def __init__(self, conversations_file: str, debug: bool = False):
+    def __init__(self, conversations_file: str, debug: bool = False, format: str = "auto"):
         self.conversations_file = conversations_file
         self.debug = debug
         self.logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class TUI:
             self.logger.setLevel(logging.DEBUG)
         
         # Load data
-        self.conversations = load_conversations(conversations_file)
+        self.conversations = load_conversations(conversations_file, format=format)
         self.tree = ConversationTree(conversations_file)
         
         # UI state
@@ -465,8 +465,10 @@ class TUI:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="ChatGPT History Browser")
-    parser.add_argument("conversations_file", help="Path to conversations.json file")
+    parser.add_argument("conversations_file", help="Path to conversations file or Claude project")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--format", choices=["auto", "chatgpt", "claude"], default="auto",
+                       help="Conversation format (auto-detected by default)")
     
     args = parser.parse_args()
     
@@ -475,7 +477,7 @@ def main():
         sys.exit(1)
     
     try:
-        tui = TUI(args.conversations_file, debug=args.debug)
+        tui = TUI(args.conversations_file, debug=args.debug, format=args.format)
         curses.wrapper(tui.run)
     except Exception as e:
         print(f"Error: {e}")

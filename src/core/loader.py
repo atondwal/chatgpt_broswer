@@ -2,11 +2,34 @@
 """Simple conversation loader for ChatGPT exports."""
 
 import json
+import os
 from typing import List, Dict, Any
 from src.core.models import Conversation, Message, MessageRole
+from src.core.claude_loader import load_claude_conversations
 
 
-def load_conversations(file_path: str) -> List[Conversation]:
+def load_conversations(file_path: str, format: str = "auto") -> List[Conversation]:
+    """Load conversations from file with format detection."""
+    
+    # Auto-detect format
+    if format == "auto":
+        if os.path.isdir(file_path):
+            # Directory implies Claude project
+            format = "claude"
+        elif file_path.endswith('.jsonl'):
+            format = "claude"
+        else:
+            format = "chatgpt"
+    
+    # Route to appropriate loader
+    if format == "claude":
+        return load_claude_conversations(file_path)
+    else:
+        return load_chatgpt_conversations(file_path)
+
+
+def load_chatgpt_conversations(file_path: str) -> List[Conversation]:
+    """Load conversations from ChatGPT JSON export."""
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     

@@ -4,7 +4,7 @@ This file contains important context about the ChatGPT Browser project that shou
 
 ## Project Overview
 
-ChatGPT Browser is a simple, fast terminal-based tool for browsing and organizing ChatGPT conversation history. The codebase emphasizes simplicity and self-documenting code.
+ChatGPT Browser is a simple, fast terminal-based tool for browsing and organizing ChatGPT and Claude conversation history. The codebase emphasizes simplicity and self-documenting code.
 
 ## Key Design Principles
 
@@ -30,13 +30,20 @@ chatgpt_browser/
 └── data/samples/        # Sample data
 ```
 
-## Recent Refactoring (2024)
+## Recent Updates
 
+### Refactoring (2024)
 The codebase was significantly refactored to improve modularity:
-
 1. **Action Registration System**: Managers now register their actions with the TUI instead of having all logic in tui.py
 2. **Modular Managers**: Separate managers for selection, search, operations, actions, and tree operations
 3. **Reduced File Sizes**: TUI.py reduced from 1073 to 545 lines (49% reduction)
+
+### Claude Support (2024)
+Added support for browsing Claude Code conversation history:
+1. **JSONL Format**: Claude stores conversations as JSONL files (one JSON object per line)
+2. **Project Structure**: Conversations organized by project in `~/.claude/projects/<PROJECT_NAME>/`
+3. **Auto-detection**: Format is automatically detected based on file extension or directory
+4. **Unified Interface**: Both ChatGPT and Claude conversations use the same UI
 
 ## Key Components
 
@@ -45,6 +52,11 @@ The codebase was significantly refactored to improve modularity:
 - `ActionContext` passes state between components
 - `ActionResult` standardized return type
 - Managers: SelectionManager, SearchManager, OperationsManager, ActionManager, TreeManager
+
+### Data Loading
+- `loader.py`: Auto-detects format and routes to appropriate loader
+- `claude_loader.py`: Handles Claude JSONL format
+- Unified `Conversation` and `Message` models for both formats
 
 ### Features
 - Vim-like navigation (h/j/k/l, gg/G, etc.)
