@@ -5,27 +5,38 @@ import json
 import os
 from typing import List, Dict, Any
 from src.core.models import Conversation, Message, MessageRole
-from src.core.claude_loader import load_claude_conversations
+from src.core.claude_loader import load_claude_conversations, load_claude_conversation
+from src.core.lazy_loader import LazyConversationLoader, ConversationMetadata
+from src.core.performance import get_performance_monitor, enable_performance_monitoring, ProgressIndicator
+from src.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
-def load_conversations(file_path: str, format: str = "auto") -> List[Conversation]:
+def load_conversations(file_path: str, format: str = "auto", use_lazy_loading: bool = False) -> List[Conversation]:
     """Load conversations from file with format detection."""
+    monitor = get_performance_monitor()
     
-    # Auto-detect format
-    if format == "auto":
-        if os.path.isdir(file_path):
-            # Directory implies Claude project
-            format = "claude"
-        elif file_path.endswith('.jsonl'):
-            format = "claude"
+    with monitor.measure("load_conversations", file_path=file_path, format=format, lazy=use_lazy_loading):
+        # Auto-detect format
+        if format == "auto":
+            if os.path.isdir(file_path):
+                # Directory implies Claude project
+                format = "claude"
+            elif file_path.endswith('.jsonl'):
+                format = "claude"
+            else:
+                format = "chatgpt"
+        
+        # Use lazy loading for large datasets
+        if use_lazy_loading:
+            return _load_conversations_lazy(file_path, format)
+        
+        # Route to appropriate loader
+        if format == "claude":
+            return load_claude_conversations(file_path)
         else:
-            format = "chatgpt"
-    
-    # Route to appropriate loader
-    if format == "claude":
-        return load_claude_conversations(file_path)
-    else:
-        return load_chatgpt_conversations(file_path)
+            return load_chatgpt_conversations(file_path)
 
 
 def load_chatgpt_conversations(file_path: str) -> List[Conversation]:
@@ -179,4 +190,59 @@ def extract_content(msg_data: Dict[str, Any]) -> str:
     
     # Fallback
     return str(content) if content else "[Empty message]"
+
+
+def _load_conversations_lazy(file_path: str, format: str) -> List[Conversation]:
+    """Load conversations using lazy loading system."""
+    lazy_loader = LazyConversationLoader(cache_size=50, cache_memory_mb=100)
+    
+    # Register loaders
+    lazy_loader.register_loader("chatgpt", _load_single_chatgpt_conversation)
+    lazy_loader.register_loader("claude", load_claude_conversation)
+    
+    # Scan for metadata
+    metadata_list = lazy_loader.scan_conversations(file_path, format)
+    
+    if not metadata_list:
+        logger.warning(f"No conversations found in {file_path}")
+        return []
+    
+    # Show progress for large datasets
+    if len(metadata_list) > 50:
+        progress = ProgressIndicator(len(metadata_list), "Loading conversations")
+        
+        conversations = []
+        for i, metadata in enumerate(metadata_list):
+            conv = lazy_loader.load_conversation(metadata.id)
+            if conv:
+                conversations.append(conv)
+            progress.update()
+        
+        progress.finish()
+        return conversations
+    else:
+        # Load all conversations for smaller datasets
+        conversations = []
+        for metadata in metadata_list:
+            conv = lazy_loader.load_conversation(metadata.id)
+            if conv:
+                conversations.append(conv)
+        return conversations
+
+
+def _load_single_chatgpt_conversation(file_path: str) -> Conversation:
+    """Load a single ChatGPT conversation from file."""
+    conversations = load_chatgpt_conversations(file_path)
+    return conversations[0] if conversations else None
+
+
+def enable_performance_mode(enabled: bool = True) -> None:
+    """Enable performance monitoring for conversation loading."""
+    enable_performance_monitoring(enabled)
+    
+
+def get_loader_stats() -> Dict[str, Any]:
+    """Get performance statistics for loader operations."""
+    monitor = get_performance_monitor()
+    return monitor.get_stats()
 
