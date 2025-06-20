@@ -125,9 +125,10 @@ python scripts/cgpt.py projects
 - **?**: Show help with all commands
 
 ### Reading Conversations
-- **Enter**: Opens conversation in your `$EDITOR` (vim, nano, etc.)
-- The conversation is formatted as Markdown for easy reading
-- Automatically cleans up temp file when you close the editor
+- **Enter**: Opens conversation in `less` for fast incremental viewing
+- **e**: Opens conversation in your `$EDITOR` (vim, nano, etc.) for full editing
+- Conversations are formatted as Markdown for syntax highlighting
+- `less` provides instant viewing with search, scrolling, and navigation
 
 ## 🌳 Enhanced Tree View Features
 

@@ -19,7 +19,7 @@ class TreeManager(ActionHandler):
     # ActionHandler implementation
     def can_handle(self, action: str) -> bool:
         """Check if this handler can process the action."""
-        actions = {"select", "toggle", "expand_all", "collapse_all",
+        actions = {"select", "view", "edit", "toggle", "expand_all", "collapse_all",
                    "filter_folders", "filter_conversations", "show_all",
                    "toggle_sort", "clear_custom_order", "refresh", "help"}
         return action in actions or action.startswith("expand_depth_")
@@ -27,6 +27,7 @@ class TreeManager(ActionHandler):
     def handle(self, action: str, context: ActionContext) -> Optional[ActionResult]:
         """Handle tree-specific actions."""
         if action == "select":
+            # Keep legacy select behavior for backwards compatibility
             if not context.selected_item:
                 return ActionResult(False)
             
@@ -35,12 +36,33 @@ class TreeManager(ActionHandler):
                 self.tree.toggle_folder(node.id)
                 return ActionResult(True, refresh_tree=True)
             elif conv:
-                # Open conversation in editor
+                # Default to view action
+                return self._view_in_less(conv)
+                
+        elif action == "view":
+            if not context.selected_item:
+                return ActionResult(False)
+            
+            node, conv, _ = context.selected_item
+            if node.is_folder:
+                self.tree.toggle_folder(node.id)
+                return ActionResult(True, refresh_tree=True)
+            elif conv:
+                return self._view_in_less(conv)
+                
+        elif action == "edit":
+            if not context.selected_item:
+                return ActionResult(False)
+            
+            node, conv, _ = context.selected_item
+            if conv:
                 try:
                     self._open_in_editor(conv)
                     return ActionResult(True, message="Opened in editor")
                 except Exception as e:
                     return ActionResult(False, message=f"Failed to open editor: {e}")
+            else:
+                return ActionResult(False, message="Cannot edit folders")
                 
         elif action == "toggle":
             if context.selected_item:
@@ -178,7 +200,8 @@ class TreeManager(ActionHandler):
             "  o/O        - Sort order/Clear custom",
             "",
             "View Control:",
-            "  Enter      - Open conversation in editor/toggle folder",
+            "  Enter      - View conversation in less/toggle folder",
+            "  e          - Edit conversation in $EDITOR",
             "  E          - Expand all",
             "  C          - Collapse all", 
             "  1-5        - Expand to depth",
@@ -264,3 +287,37 @@ class TreeManager(ActionHandler):
         
         # Last resort
         return 'less'
+    
+    def _view_in_less(self, conversation) -> ActionResult:
+        """View conversation in less for fast incremental viewing."""
+        try:
+            # Export conversation
+            content = export_conversation(conversation, format="markdown")
+            
+            # Suspend curses
+            import curses
+            curses.endwin()
+            
+            try:
+                # Use less with sensible options:
+                # -R: show raw control characters (for colors)
+                # -S: chop long lines (don't wrap)
+                # -F: quit if less than one screen
+                # -X: don't clear screen on exit
+                less_cmd = ['less', '-R', '-S', '-F', '-X']
+                
+                # Pipe content to less
+                proc = subprocess.Popen(less_cmd, stdin=subprocess.PIPE, text=True)
+                proc.communicate(input=content)
+                
+            finally:
+                # Resume curses
+                curses.doupdate()
+            
+            return ActionResult(True, message="Viewed in less")
+            
+        except Exception as e:
+            # Resume curses if there was an error
+            import curses
+            curses.doupdate()
+            return ActionResult(False, message=f"Failed to view: {e}")

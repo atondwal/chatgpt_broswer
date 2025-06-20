@@ -109,7 +109,9 @@ class TreeView:
         elif key == ord('l'):  # Expand or enter
             return self._expand_or_enter()
         elif key in (10, 13, curses.KEY_ENTER):
-            return "select"
+            return "view"
+        elif key == ord('e'):
+            return "edit"
         elif key == ord(' '):  # Toggle folder
             return "toggle"
         elif key == ord('*'):  # Expand all
