@@ -36,10 +36,16 @@ class ViewMode(Enum):
 class TUI:
     """Terminal interface for browsing ChatGPT conversations."""
     
-    def __init__(self, conversations_file: str, debug: bool = False, format: str = "auto"):
+    def __init__(self, conversations_file: str, debug: bool = False, format: str = "auto", skip_env_validation: bool = False):
         self.conversations_file = conversations_file
         self.debug = debug
         self.logger = get_logger(__name__)
+        
+        # Basic environment validation (skip for tests)
+        if not skip_env_validation:
+            import sys
+            if not sys.stdout.isatty():
+                raise RuntimeError("Environment not suitable for TUI operation")
         
         # Load data
         self.conversations = load_conversations(conversations_file, format=format)

@@ -374,7 +374,7 @@ class TestTUIEnhancements:
             }], f)
             self.test_file = f.name
         
-        self.tui = TUI(self.test_file)
+        self.tui = TUI(self.test_file, skip_env_validation=True)
         self.tui.conversations = [
             Conversation("1", "Test Conv 1", [], create_time=1234567890),
             Conversation("2", "Test Conv 2", [], create_time=1234567891)
@@ -1073,7 +1073,7 @@ class TestKeybindingIntegration:
             }], f)
             self.test_file = f.name
         
-        self.tui = TUI(self.test_file)
+        self.tui = TUI(self.test_file, skip_env_validation=True)
     
     def test_keybinding_result_handling(self):
         """Test that keybinding results are properly handled."""
