@@ -11,6 +11,7 @@ from src.core.claude_loader import list_claude_projects, find_claude_project_for
 from src.core.time_utils import format_relative_time
 from src.core.exporter import export_conversation as export_conv
 from src.core.logging_config import setup_logging, get_logger
+from src.core.validation import validate_project_selection, validate_conversation_number, validate_file_path
 
 
 def list_conversations(file_path: str, count: int = 20, format: str = "auto") -> None:
@@ -53,10 +54,13 @@ def export_conversation(file_path: str, number: int, format: str = "auto", expor
         print("No conversations found.")
         return
         
-    idx = number - 1
-    if idx < 0 or idx >= len(conversations):
+    # Validate conversation number
+    validated_num = validate_conversation_number(str(number), len(conversations))
+    if validated_num is None:
         print(f"Error: Conversation {number} not found (1-{len(conversations)})")
         return
+    
+    idx = validated_num - 1
         
     conv = conversations[idx]
     
@@ -216,25 +220,30 @@ def main():
             print()
             try:
                 choice = input("Enter project number or full path: ").strip()
-                if choice.isdigit():
-                    idx = int(choice) - 1
-                    if 0 <= idx < len(projects):
-                        args.conversations_file = projects[idx]['path']
-                        args.format = "claude"
-                    else:
-                        print(f"Invalid project number. Must be 1-{len(projects)}")
-                        sys.exit(1)
+                selection = validate_project_selection(choice, projects)
+                
+                if selection is None:
+                    print(f"Invalid selection. Please enter a number (1-{len(projects)}) or a valid file path.")
+                    sys.exit(1)
+                elif isinstance(selection, int):
+                    # Project number selected
+                    args.conversations_file = projects[selection]['path']
+                    args.format = "claude"
                 else:
-                    # Treat as file path
-                    args.conversations_file = choice
+                    # File path selected
+                    args.conversations_file = selection
             except (KeyboardInterrupt, EOFError):
                 print("\nCancelled.")
                 sys.exit(0)
     
-    # Check file exists
-    if not Path(args.conversations_file).exists():
-        print(f"Error: File not found: {args.conversations_file}")
+    # Validate file path
+    validated_path = validate_file_path(args.conversations_file, must_exist=True)
+    if validated_path is None:
+        print(f"Error: File not found or invalid: {args.conversations_file}")
         sys.exit(1)
+    
+    # Update with normalized path
+    args.conversations_file = str(validated_path)
     
     # Execute command
     if args.command == "list":
