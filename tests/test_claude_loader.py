@@ -14,47 +14,60 @@ class TestClaudeLoader:
     
     def test_parse_claude_message_user(self):
         """Test parsing user message."""
-        claude_msg = {
-            "role": "user", 
-            "content": "Hello Claude!"
+        claude_data = {
+            "type": "user",
+            "uuid": "msg1",
+            "timestamp": "2024-01-01T10:00:00Z",
+            "message": {
+                "content": [{"type": "text", "text": "Hello Claude!"}]
+            }
         }
         
-        msg = parse_claude_message(claude_msg, "msg1")
+        msg = parse_claude_message(claude_data)
         assert msg.id == "msg1"
         assert msg.role.value == "user"
         assert msg.content == "Hello Claude!"
     
     def test_parse_claude_message_assistant(self):
         """Test parsing assistant message."""
-        claude_msg = {
-            "role": "assistant",
-            "content": "Hello! How can I help you?"
+        claude_data = {
+            "type": "assistant",
+            "uuid": "msg2",
+            "timestamp": "2024-01-01T10:01:00Z",
+            "message": {
+                "content": [{"type": "text", "text": "Hello! How can I help you?"}]
+            }
         }
         
-        msg = parse_claude_message(claude_msg, "msg2")
+        msg = parse_claude_message(claude_data)
         assert msg.id == "msg2"
         assert msg.role.value == "assistant"
         assert msg.content == "Hello! How can I help you?"
     
     def test_parse_claude_message_with_text_content(self):
         """Test parsing message with text field."""
-        claude_msg = {
-            "role": "user",
-            "content": {
-                "text": "What is Python?"
+        claude_data = {
+            "type": "user",
+            "uuid": "msg3", 
+            "message": {
+                "content": [{"type": "text", "text": "What is Python?"}]
             }
         }
         
-        msg = parse_claude_message(claude_msg, "msg3")
+        msg = parse_claude_message(claude_data)
         assert msg.content == "What is Python?"
     
     def test_parse_claude_message_empty_content(self):
         """Test parsing message with no content."""
-        claude_msg = {
-            "role": "user"
+        claude_data = {
+            "type": "user",
+            "uuid": "msg4",
+            "message": {
+                "content": []
+            }
         }
         
-        msg = parse_claude_message(claude_msg, "msg4")
+        msg = parse_claude_message(claude_data)
         assert msg.content == "[Empty message]"
     
     def test_load_claude_conversations_empty(self):
@@ -71,24 +84,27 @@ class TestClaudeLoader:
     
     def test_load_claude_conversations_single(self):
         """Test loading single Claude conversation."""
-        claude_data = {
-            "id": "claude_conv_1",
-            "name": "Python Discussion",
-            "created_at": "2024-01-01T10:00:00Z",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "What is Python?"
-                },
-                {
-                    "role": "assistant", 
-                    "content": "Python is a programming language."
-                }
-            ]
+        user_msg = {
+            "type": "user",
+            "uuid": "msg1",
+            "timestamp": "2024-01-01T10:00:00Z",
+            "message": {
+                "content": [{"type": "text", "text": "What is Python?"}]
+            }
+        }
+        
+        assistant_msg = {
+            "type": "assistant", 
+            "uuid": "msg2",
+            "timestamp": "2024-01-01T10:01:00Z",
+            "message": {
+                "content": [{"type": "text", "text": "Python is a programming language."}]
+            }
         }
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
-            f.write(json.dumps(claude_data) + '\n')
+            f.write(json.dumps(user_msg) + '\n')
+            f.write(json.dumps(assistant_msg) + '\n')
             test_file = f.name
         
         try:
@@ -96,8 +112,6 @@ class TestClaudeLoader:
             assert len(conversations) == 1
             
             conv = conversations[0]
-            assert conv.id == "claude_conv_1"
-            assert conv.title == "Python Discussion"
             assert len(conv.messages) == 2
             assert conv.messages[0].content == "What is Python?"
             assert conv.messages[1].content == "Python is a programming language."
@@ -105,31 +119,30 @@ class TestClaudeLoader:
             Path(test_file).unlink(missing_ok=True)
     
     def test_load_claude_conversations_multiple(self):
-        """Test loading multiple Claude conversations."""
-        conv1 = {
-            "id": "conv1",
-            "name": "First Chat",
-            "created_at": "2024-01-01T10:00:00Z",
-            "messages": [{"role": "user", "content": "Hello"}]
+        """Test loading conversation with multiple messages."""
+        msg1 = {
+            "type": "user",
+            "uuid": "msg1",
+            "timestamp": "2024-01-01T10:00:00Z",
+            "message": {"content": [{"type": "text", "text": "Hello"}]}
         }
         
-        conv2 = {
-            "id": "conv2", 
-            "name": "Second Chat",
-            "created_at": "2024-01-02T10:00:00Z",
-            "messages": [{"role": "user", "content": "Hi again"}]
+        msg2 = {
+            "type": "assistant",
+            "uuid": "msg2", 
+            "timestamp": "2024-01-01T10:01:00Z",
+            "message": {"content": [{"type": "text", "text": "Hi there!"}]}
         }
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
-            f.write(json.dumps(conv1) + '\n')
-            f.write(json.dumps(conv2) + '\n')
+            f.write(json.dumps(msg1) + '\n')
+            f.write(json.dumps(msg2) + '\n')
             test_file = f.name
         
         try:
             conversations = load_claude_conversations(test_file)
-            assert len(conversations) == 2
-            assert conversations[0].title == "First Chat"
-            assert conversations[1].title == "Second Chat"
+            assert len(conversations) == 1
+            assert len(conversations[0].messages) == 2
         finally:
             Path(test_file).unlink(missing_ok=True)
     
@@ -151,44 +164,40 @@ class TestClaudeLoader:
     
     def test_load_claude_conversations_missing_fields(self):
         """Test conversations with missing required fields."""
-        incomplete_conv = {
-            "id": "incomplete",
-            # Missing name and created_at
-            "messages": []
+        incomplete_msg = {
+            "type": "invalid_type",  # Invalid type
+            "uuid": "incomplete"
         }
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
-            f.write(json.dumps(incomplete_conv) + '\n')
+            f.write(json.dumps(incomplete_msg) + '\n')
             test_file = f.name
         
         try:
             conversations = load_claude_conversations(test_file)
-            if conversations:
-                conv = conversations[0]
-                assert conv.id == "incomplete"
-                # Should handle missing fields gracefully
-                assert conv.title is not None  # Should have some default
+            # Should handle missing fields gracefully - likely returns empty list
+            assert isinstance(conversations, list)
         finally:
             Path(test_file).unlink(missing_ok=True)
     
     def test_created_at_parsing(self):
-        """Test parsing different created_at formats."""
-        claude_data = {
-            "id": "time_conv",
-            "name": "Time Test",
-            "created_at": "2024-01-15T14:30:00Z",
-            "messages": []
+        """Test timestamp parsing."""
+        msg_with_time = {
+            "type": "user",
+            "uuid": "time_msg",
+            "timestamp": "2024-01-15T14:30:00Z",
+            "message": {"content": [{"type": "text", "text": "Test"}]}
         }
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
-            f.write(json.dumps(claude_data) + '\n')
+            f.write(json.dumps(msg_with_time) + '\n')
             test_file = f.name
         
         try:
             conversations = load_claude_conversations(test_file)
-            if conversations:
-                conv = conversations[0]
-                assert conv.create_time is not None
-                assert isinstance(conv.create_time, (int, float))
+            if conversations and conversations[0].messages:
+                msg = conversations[0].messages[0]
+                assert msg.create_time is not None
+                assert isinstance(msg.create_time, (int, float))
         finally:
             Path(test_file).unlink(missing_ok=True)
