@@ -135,6 +135,8 @@ class TreeView:
             return "repeat"
         elif key == ord('p'):  # Paste/duplicate
             return "paste"
+        elif key == ord('r'):  # Resume Claude session
+            return "resume"
         # Function keys
         elif key == curses.KEY_F1:  # F1 - Help
             return "help"

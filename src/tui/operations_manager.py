@@ -264,7 +264,7 @@ class OperationsManager(ActionHandler):
     def can_handle(self, action: str) -> bool:
         """Check if this handler can process the action."""
         actions = {"new_folder", "rename", "delete", "move_up", "move_down", 
-                   "indent", "outdent", "move", "bulk_move"}
+                   "indent", "outdent", "move", "bulk_move", "resume"}
         return action in actions
         
     def handle(self, action: str, context: ActionContext) -> Optional[ActionResult]:
@@ -371,6 +371,9 @@ class OperationsManager(ActionHandler):
                                   refresh_tree=True, clear_selection=True)
             return ActionResult(False, message=message)
             
+        elif action == "resume":
+            return self._handle_resume(context)
+            
         return None
         
     def _handle_bulk_move(self, context: ActionContext) -> ActionResult:
@@ -398,3 +401,50 @@ class OperationsManager(ActionHandler):
                               clear_selection=True)
         else:
             return ActionResult(False, message="No items could be moved")
+            
+    def _handle_resume(self, context: ActionContext) -> ActionResult:
+        """Handle resuming a Claude conversation."""
+        if not context.selected_item:
+            return ActionResult(False, message="No conversation selected to resume")
+            
+        node, conv, _ = context.selected_item
+        if node.is_folder:
+            return ActionResult(False, message="Cannot resume a folder - select a conversation")
+            
+        if not conv:
+            return ActionResult(False, message="No conversation data available")
+            
+        # Extract session ID from conversation
+        session_id = getattr(conv, 'id', None) or getattr(conv, 'session_id', None)
+        if not session_id:
+            return ActionResult(False, message="No session ID found for this conversation")
+            
+            
+        # Execute claude --resume command properly with ncurses
+        import subprocess
+        import curses
+        import os
+        from pathlib import Path
+        # Properly end ncurses mode
+        
+        # Get the project directory from the conversation file path and run claude from there
+        file_path = conv.metadata.get('file', '')
+        cwd = None
+        try:
+            if file_path:
+                # Decode project name back to original path
+                project_dir = Path(file_path).parent
+                project_name = project_dir.name
+                if project_name.startswith('-'):
+                    # Convert "-home-atondwal-playground" to "/home/atondwal/playground"
+                    original_path = '/' + project_name[1:].replace('-', '/')
+                    if Path(original_path).exists():
+                        cwd = original_path
+        finally:
+            curses.endwin()
+        
+        # Run the claude command with the correct working directory
+        # Use os.execvp to replace the current process entirely
+        if cwd:
+            os.chdir(cwd)
+        os.system(f'claude --resume {session_id}')
