@@ -112,8 +112,11 @@ def list_claude_projects_cmd() -> None:
         # Format last modified time
         last_mod = format_relative_time(project['last_modified'])
         
-        # Clean up project name
-        clean_name = name.lstrip('-').replace('-', '/')
+        # Clean up project name and add leading slash
+        if name.startswith('-'):
+            clean_name = '/' + name[1:].replace('-', '/')
+        else:
+            clean_name = '/' + name.replace('-', '/')
         
         # Use ❯ for first item
         marker = "❯" if i == 1 else " "
@@ -194,9 +197,31 @@ def main():
             args.conversations_file = claude_project
             args.format = "claude"
         else:
-            # Fall back to showing Claude project picker
+            # Fall back to showing Claude project picker with prompt
+            projects = list_claude_projects()
+            if not projects:
+                print("No Claude projects found.")
+                print("Please provide a conversation file path or create a Claude project.")
+                sys.exit(1)
+            
             list_claude_projects_cmd()
-            return
+            print()
+            try:
+                choice = input("Enter project number or full path: ").strip()
+                if choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(projects):
+                        args.conversations_file = projects[idx]['path']
+                        args.format = "claude"
+                    else:
+                        print(f"Invalid project number. Must be 1-{len(projects)}")
+                        sys.exit(1)
+                else:
+                    # Treat as file path
+                    args.conversations_file = choice
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled.")
+                sys.exit(0)
     
     # Check file exists
     if not Path(args.conversations_file).exists():

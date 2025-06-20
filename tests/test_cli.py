@@ -192,10 +192,16 @@ class TestCLIClaudeProjectDetection:
         """Test main function with no arguments falls back to project picker."""
         with patch('sys.argv', ['cli']):
             with patch('src.cli.cli.find_claude_project_for_cwd') as mock_find:
-                with patch('src.cli.cli.list_claude_projects_cmd') as mock_projects:
-                    mock_find.return_value = None
-                    main()
-                    mock_projects.assert_called_once()
+                with patch('src.cli.cli.list_claude_projects') as mock_list_projects:
+                    with patch('src.cli.cli.list_claude_projects_cmd') as mock_projects_cmd:
+                        with patch('builtins.input', return_value='1'):
+                            with patch('pathlib.Path.exists', return_value=True):
+                                mock_find.return_value = None
+                                mock_list_projects.return_value = [
+                                    {'name': 'test-project', 'path': '/fake/path', 'conversation_count': 5}
+                                ]
+                                main()
+                                mock_projects_cmd.assert_called_once()
     
     def test_main_no_args_with_claude_project_list_command(self):
         """Test main function with list command auto-detects Claude project."""

@@ -8,6 +8,12 @@ ChatGPT Browser is a simple, fast terminal-based tool for browsing and organizin
 
 ## Development Commands
 
+### Terminal Cleanup
+```bash
+# Fix terminal after bad curses exit
+python -c "import curses; curses.endwin()" 2>/dev/null || echo "Attempted terminal cleanup"
+```
+
 ### Testing
 ```bash
 # Run all tests

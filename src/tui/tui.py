@@ -480,12 +480,33 @@ def main():
             print("No conversation file specified. Available Claude projects:")
             print("=" * 50)
             for i, project in enumerate(projects, 1):
-                name = project['name'].lstrip('-').replace('-', '/')
+                name = project['name']
+                # Clean up project name and add leading slash
+                if name.startswith('-'):
+                    clean_name = '/' + name[1:].replace('-', '/')
+                else:
+                    clean_name = '/' + name.replace('-', '/')
                 count = project['conversation_count']
-                print(f"{i:2}. {name} ({count} conversations)")
+                print(f"{i:2}. {clean_name} ({count} conversations)")
             
             print("\nUse: cgpt-tui ~/.claude/projects/<PROJECT_NAME>")
-            sys.exit(0)
+            print("  or: cgpt-tui <project_number>")
+            try:
+                choice = input("\nEnter project number or full path: ").strip()
+                if choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(projects):
+                        args.conversations_file = projects[idx]['path']
+                        args.format = "claude"
+                    else:
+                        print(f"Invalid project number. Must be 1-{len(projects)}")
+                        sys.exit(1)
+                else:
+                    # Treat as file path
+                    args.conversations_file = choice
+            except (KeyboardInterrupt, EOFError):
+                print("\nCancelled.")
+                sys.exit(0)
     
     if not Path(args.conversations_file).exists():
         print(f"File not found: {args.conversations_file}")
