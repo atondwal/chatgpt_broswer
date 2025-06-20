@@ -12,6 +12,8 @@ from typing import List
 from src.core.loader import load_conversations
 from src.core.claude_loader import find_claude_project_for_cwd, list_claude_projects
 from src.core.exporter import export_conversation as export_conv
+from src.core.logging_config import setup_logging, get_logger
+from src.core.curses_context import curses_context, emergency_cleanup
 from src.tree.tree import ConversationTree
 from src.tui.input import get_input, confirm, select_folder
 from src.tui.tree_view import TreeView
@@ -37,9 +39,7 @@ class TUI:
     def __init__(self, conversations_file: str, debug: bool = False, format: str = "auto"):
         self.conversations_file = conversations_file
         self.debug = debug
-        self.logger = logging.getLogger(__name__)
-        if debug:
-            self.logger.setLevel(logging.DEBUG)
+        self.logger = get_logger(__name__)
         
         # Load data
         self.conversations = load_conversations(conversations_file, format=format)
@@ -503,6 +503,10 @@ def main():
     
     args = parser.parse_args()
     
+    # Setup logging
+    setup_logging(debug_mode=args.debug)
+    logger = get_logger(__name__)
+    
     # Auto-detect Claude project if no file specified
     if not args.conversations_file:
         # Check if we're in a Claude project directory
@@ -555,8 +559,14 @@ def main():
     
     try:
         tui = TUI(args.conversations_file, debug=args.debug, format=args.format)
-        curses.wrapper(tui.run)
+        with curses_context() as stdscr:
+            tui.run(stdscr)
+    except KeyboardInterrupt:
+        logger.info("Application interrupted by user")
+        print("\nApplication interrupted.")
     except Exception as e:
+        emergency_cleanup()
+        logger.error(f"Application error: {e}")
         print(f"Error: {e}")
         if args.debug:
             raise

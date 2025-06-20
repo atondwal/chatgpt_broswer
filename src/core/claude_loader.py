@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from src.core.models import Conversation, Message, MessageRole
+from src.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def load_claude_conversations(file_path: str) -> List[Conversation]:
@@ -37,7 +40,7 @@ def load_claude_conversation(file_path: str) -> Optional[Conversation]:
     try:
         file_stat = os.stat(file_path)
         file_modified_time = file_stat.st_mtime
-    except:
+    except (OSError, FileNotFoundError):
         file_modified_time = None
     
     # Extract project name from path
@@ -76,7 +79,7 @@ def load_claude_conversation(file_path: str) -> Optional[Conversation]:
                     messages.append(msg)
     
     except Exception as e:
-        print(f"Error loading {file_path}: {e}")
+        logger.error(f"Error loading {file_path}: {e}")
         return None
     
     if not messages:
@@ -321,8 +324,8 @@ def list_claude_projects() -> List[Dict[str, Any]]:
                     mtime = jsonl_file.stat().st_mtime
                     if latest_time is None or mtime > latest_time:
                         latest_time = mtime
-                except:
-                    pass
+                except (OSError, FileNotFoundError):
+                    pass  # Skip files that can't be accessed
             
             projects.append({
                 'name': project_dir.name,

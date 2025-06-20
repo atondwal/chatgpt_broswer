@@ -2,6 +2,7 @@
 """Simple, self-documenting conversation tree."""
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -72,9 +73,9 @@ class ConversationTree:
             
             # Clean up any invalid references
             self._clean_invalid_references()
-        except Exception:
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
             # If loading fails, start fresh
-            pass
+            logging.debug(f"Failed to load tree structure from {self.tree_file}: {e}")
     
     def _clean_invalid_references(self) -> None:
         """Remove invalid node references."""

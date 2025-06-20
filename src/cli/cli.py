@@ -10,6 +10,7 @@ from src.core.loader import load_conversations
 from src.core.claude_loader import list_claude_projects, find_claude_project_for_cwd
 from src.core.time_utils import format_relative_time
 from src.core.exporter import export_conversation as export_conv
+from src.core.logging_config import setup_logging, get_logger
 
 
 def list_conversations(file_path: str, count: int = 20, format: str = "auto") -> None:
@@ -134,6 +135,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
+    # Add debug option
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    
     # File argument
     parser.add_argument(
         "conversations_file",
@@ -178,6 +182,10 @@ def main():
                               help="Search in message content too")
     
     args = parser.parse_args()
+    
+    # Setup logging
+    setup_logging(debug_mode=args.debug)
+    logger = get_logger(__name__)
     
     # Handle Claude project shortcut
     if args.claude_project:
