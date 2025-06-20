@@ -69,15 +69,26 @@ python scripts/cgpt-tui.py --claude-project <PROJECT_NAME>
 ### Running the CLI
 
 ```bash
-# Direct execution
+# List conversations (matches claude --resume format)
 python scripts/cgpt.py conversations.json list
+# Output:
+#      Modified     Created      # Messages  Summary
+# ❯  1. 10h ago     1 day ago          133 This session is being continued from...
+#    2. 1 day ago   1 day ago          607 Refactoring TUI: Breaking Down...
+#    3. 2 days ago  2 days ago          281 ChatGPT Browser: Tree Org, TUI...
+
+# Search conversations
 python scripts/cgpt.py conversations.json search "python"
+
+# Export a specific conversation
 python scripts/cgpt.py conversations.json export 1
 
-# After installation
-cgpt conversations.json list
-cgpt conversations.json search "python"
-cgpt conversations.json export 1
+# List Claude projects
+python scripts/cgpt.py projects
+# Output:
+#      Last Modified   # Convos   Project Name
+# ❯  1. Just now              20  home/atondwal/playground
+#    2. 2 days ago             1  home/atondwal
 ```
 
 ## 🎮 TUI Controls
@@ -114,9 +125,9 @@ cgpt conversations.json export 1
 - **?**: Show help with all commands
 
 ### Reading Conversations
-- **↑/↓**: Scroll
-- **Page Up/Down**: Page scroll
-- **q**: Back to list
+- **Enter**: Opens conversation in your `$EDITOR` (vim, nano, etc.)
+- The conversation is formatted as Markdown for easy reading
+- Automatically cleans up temp file when you close the editor
 
 ## 🌳 Enhanced Tree View Features
 

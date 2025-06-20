@@ -5,6 +5,7 @@ import curses
 from datetime import datetime
 from typing import List, Tuple, Optional
 from src.tree.tree import TreeNode
+from src.core.time_utils import format_relative_time
 
 
 class TreeView:
@@ -243,6 +244,9 @@ class TreeView:
         
         # Draw header with counts
         header = f"📁 {folders} folders, 💬 {convs} conversations"
+        if convs > 0 and self.show_dates:
+            # Add column headers for conversations
+            header += " " * (max(0, 40 - len(header))) + "Modified    Created     Msgs"
         self.stdscr.addstr(self.y, self.x, header, curses.A_BOLD)
         
         # Draw tree items
@@ -305,11 +309,22 @@ class TreeView:
             icon = "💬"
             name = conv.title if conv else node.name
             
-            # Add date for conversations if enabled
-            if self.show_dates and conv and conv.create_time:
-                date_str = datetime.fromtimestamp(conv.create_time).strftime("%m/%d")
-                # Show date right after the title with minimal spacing
-                display = f"{indent}{branch}{selection_marker}{icon} {name} [{date_str}]"
+            # Format conversation info in claude --resume style
+            if self.show_dates and conv:
+                # Get times
+                modified = format_relative_time(conv.update_time)
+                created = format_relative_time(conv.create_time)
+                msg_count = len(conv.messages) if conv.messages else 0
+                
+                # Calculate space needed for the format
+                # icon (3) + space + [modified] (12) + space + [created] (12) + space + (msgs) (7) = ~37 chars
+                format_overhead = 37
+                max_name_len = self.width - len(indent) - len(branch) - len(selection_marker) - format_overhead - 2
+                if len(name) > max_name_len and max_name_len > 0:
+                    name = name[:max_name_len - 3] + "..."
+                
+                # Format: icon modified • created (msgs) title
+                display = f"{indent}{branch}{selection_marker}{icon} {modified:<10} • {created:<10} ({msg_count:>4}) {name}"
             else:
                 display = f"{indent}{branch}{selection_marker}{icon} {name}"
             

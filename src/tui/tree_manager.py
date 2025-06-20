@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Tree management operations for the TUI interface."""
 
+import os
+import tempfile
+import subprocess
 from typing import Optional, Any
 from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
+from src.core.exporter import export_conversation
 
 
 class TreeManager(ActionHandler):
@@ -31,9 +35,9 @@ class TreeManager(ActionHandler):
                 self.tree.toggle_folder(node.id)
                 return ActionResult(True, refresh_tree=True)
             elif conv:
-                context.tui.detail_view.set_conversation(conv)
-                from src.tui.tui import ViewMode
-                return ActionResult(True, change_view=ViewMode.DETAIL)
+                # Open conversation in editor
+                self._open_in_editor(conv)
+                return ActionResult(True)
                 
         elif action == "toggle":
             if context.selected_item:
@@ -171,7 +175,7 @@ class TreeManager(ActionHandler):
             "  o/O        - Sort order/Clear custom",
             "",
             "View Control:",
-            "  Enter      - Open/toggle folder",
+            "  Enter      - Open conversation in editor/toggle folder",
             "  E          - Expand all",
             "  C          - Collapse all", 
             "  1-5        - Expand to depth",
@@ -200,3 +204,72 @@ class TreeManager(ActionHandler):
         help_win.refresh()
         help_win.getch()  # Wait for any key
         del help_win
+        
+    def _open_in_editor(self, conversation) -> None:
+        """Open conversation in user's editor with progress indication."""
+        # Show immediate feedback
+        self.tui.status_message = "Preparing conversation..."
+        self.tui.draw()
+        
+        # Quick check for large conversations
+        msg_count = len(conversation.messages)
+        if msg_count > 100:
+            self.tui.status_message = f"Exporting {msg_count} messages..."
+            self.tui.draw()
+        
+        try:
+            # Export conversation (now with caching and optimization)
+            content = export_conversation(conversation, format="markdown")
+            
+            # Create temp file with .md extension for syntax highlighting
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+                f.write(content)
+                temp_path = f.name
+            
+            # Get editor from environment or use sensible defaults
+            editor = self._get_editor()
+            
+            # Clear status and suspend curses
+            self.tui.status_message = ""
+            import curses
+            curses.endwin()
+            
+            try:
+                # Open in editor
+                subprocess.run([editor, temp_path])
+            finally:
+                # Resume curses
+                curses.doupdate()
+            
+        except Exception as e:
+            # Resume curses if there was an error
+            import curses
+            curses.doupdate()
+            self.tui.status_message = f"Error opening editor: {e}"
+            return
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+    
+    def _get_editor(self) -> str:
+        """Get the best available editor."""
+        # Check EDITOR environment variable first
+        editor = os.environ.get('EDITOR')
+        if editor:
+            return editor
+        
+        # Try common editors in order of preference
+        editors = ['nano', 'vim', 'vi', 'emacs', 'less', 'more']
+        for ed in editors:
+            try:
+                if subprocess.run(['which', ed], capture_output=True, 
+                                text=True).returncode == 0:
+                    return ed
+            except:
+                continue
+        
+        # Last resort
+        return 'less'

@@ -8,20 +8,43 @@ from typing import Optional
 
 from src.core.loader import load_conversations
 from src.core.claude_loader import list_claude_projects
+from src.core.time_utils import format_relative_time
+from src.core.exporter import export_conversation as export_conv
 
 
 def list_conversations(file_path: str, count: int = 20, format: str = "auto") -> None:
-    """List recent conversations."""
+    """List recent conversations in claude --resume style."""
     conversations = load_conversations(file_path, format=format)
     
-    print(f"Found {len(conversations)} conversations")
-    print("=" * 50)
+    if not conversations:
+        print("No conversations found.")
+        return
     
+    # Print header
+    print(f"     {'Modified':<12} {'Created':<12} {'# Messages':<11} Summary")
+    
+    # List conversations
     for i, conv in enumerate(conversations[:count]):
-        print(f"{i+1}. {conv.title}")
+        # Format times
+        modified = format_relative_time(conv.update_time)
+        created = format_relative_time(conv.create_time)
+        
+        # Count messages
+        msg_count = len(conv.messages)
+        
+        # Format the line
+        # Use ❯ for first item, space for others
+        marker = "❯" if i == 0 else " "
+        
+        # Truncate title if needed
+        title = conv.title
+        if len(title) > 50:
+            title = title[:47] + "..."
+        
+        print(f"{marker} {i+1:2}. {modified:<12} {created:<12} {msg_count:>10} {title}")
 
 
-def export_conversation(file_path: str, number: int, format: str = "auto") -> None:
+def export_conversation(file_path: str, number: int, format: str = "auto", export_format: str = "text") -> None:
     """Export a conversation to stdout."""
     conversations = load_conversations(file_path, format=format)
     
@@ -36,14 +59,9 @@ def export_conversation(file_path: str, number: int, format: str = "auto") -> No
         
     conv = conversations[idx]
     
-    # Print conversation
-    print(f"Conversation: {conv.title}")
-    print("=" * 50)
-    
-    for msg in conv.messages:
-        print(f"\n{msg.role.value.upper()}:")
-        print("-" * 50)
-        print(msg.content)
+    # Export using shared exporter
+    output = export_conv(conv, format=export_format)
+    print(output)
 
 
 def search_conversations(file_path: str, query: str, content: bool = False, format: str = "auto") -> None:
@@ -82,23 +100,28 @@ def list_claude_projects_cmd() -> None:
         return
     
     print(f"Found {len(projects)} Claude projects:")
-    print("=" * 60)
+    print("=" * 70)
+    
+    # Print header
+    print(f"     {'Last Modified':<15} {'# Convos':<10} Project Name")
     
     for i, project in enumerate(projects, 1):
         name = project['name']
         count = project['conversation_count']
         
         # Format last modified time
-        if project['last_modified']:
-            from datetime import datetime
-            last_mod = datetime.fromtimestamp(project['last_modified']).strftime('%Y-%m-%d %H:%M')
-        else:
-            last_mod = "Unknown"
+        last_mod = format_relative_time(project['last_modified'])
         
-        print(f"{i}. {name} ({count} conversations, last: {last_mod})")
+        # Clean up project name
+        clean_name = name.lstrip('-').replace('-', '/')
+        
+        # Use ❯ for first item
+        marker = "❯" if i == 1 else " "
+        
+        print(f"{marker} {i:2}. {last_mod:<15} {count:>8}  {clean_name}")
     
-    print("\nUse: cgpt <project_path> list")
-    print("  or: cgpt ~/.claude/projects/<PROJECT_NAME> list")
+    print("\nUse: cgpt ~/.claude/projects/<PROJECT_NAME> list")
+    print("  or: cgpt --claude-project <PROJECT_NAME> list")
 
 
 def main():
@@ -143,6 +166,8 @@ def main():
     # Export command
     export_parser = subparsers.add_parser("export", help="Export a conversation")
     export_parser.add_argument("number", type=int, help="Conversation number")
+    export_parser.add_argument("--export-format", choices=["text", "markdown", "json"], 
+                              default="text", help="Export format (default: text)")
     
     # Search command
     search_parser = subparsers.add_parser("search", help="Search conversations")
@@ -171,7 +196,8 @@ def main():
     if args.command == "list":
         list_conversations(args.conversations_file, args.count, format=args.format)
     elif args.command == "export":
-        export_conversation(args.conversations_file, args.number, format=args.format)
+        export_conversation(args.conversations_file, args.number, format=args.format, 
+                          export_format=args.export_format)
     elif args.command == "search":
         search_conversations(args.conversations_file, args.query, args.content, format=args.format)
     else:
