@@ -206,40 +206,70 @@ class TreeManager(ActionHandler):
         del help_win
         
     def _open_in_editor(self, conversation) -> None:
-        """Open conversation in user's editor."""
-        # Export conversation to temp file
-        content = export_conversation(conversation, format="markdown")
+        """Open conversation in user's editor with progress indication."""
+        # Show immediate feedback
+        self.tui.status_message = "Preparing conversation..."
+        self.tui.draw()
         
-        # Create temp file with .md extension for syntax highlighting
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            f.write(content)
-            temp_path = f.name
+        # Quick check for large conversations
+        msg_count = len(conversation.messages)
+        if msg_count > 100:
+            self.tui.status_message = f"Exporting {msg_count} messages..."
+            self.tui.draw()
         
         try:
-            # Get editor from environment or use sensible defaults
-            editor = os.environ.get('EDITOR', 'vi')
-            if not editor:
-                # Try common editors
-                for ed in ['nano', 'vim', 'vi', 'emacs', 'less']:
-                    if subprocess.run(['which', ed], capture_output=True).returncode == 0:
-                        editor = ed
-                        break
-                else:
-                    editor = 'less'  # Fallback to less for viewing
+            # Export conversation (now with caching and optimization)
+            content = export_conversation(conversation, format="markdown")
             
-            # Suspend curses temporarily
+            # Create temp file with .md extension for syntax highlighting
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+                f.write(content)
+                temp_path = f.name
+            
+            # Get editor from environment or use sensible defaults
+            editor = self._get_editor()
+            
+            # Clear status and suspend curses
+            self.tui.status_message = ""
             import curses
             curses.endwin()
             
-            # Open in editor
-            subprocess.run([editor, temp_path])
+            try:
+                # Open in editor
+                subprocess.run([editor, temp_path])
+            finally:
+                # Resume curses
+                curses.doupdate()
             
-            # Resume curses
+        except Exception as e:
+            # Resume curses if there was an error
+            import curses
             curses.doupdate()
-            
+            self.tui.status_message = f"Error opening editor: {e}"
+            return
         finally:
             # Clean up temp file
             try:
                 os.unlink(temp_path)
             except:
                 pass
+    
+    def _get_editor(self) -> str:
+        """Get the best available editor."""
+        # Check EDITOR environment variable first
+        editor = os.environ.get('EDITOR')
+        if editor:
+            return editor
+        
+        # Try common editors in order of preference
+        editors = ['nano', 'vim', 'vi', 'emacs', 'less', 'more']
+        for ed in editors:
+            try:
+                if subprocess.run(['which', ed], capture_output=True, 
+                                text=True).returncode == 0:
+                    return ed
+            except:
+                continue
+        
+        # Last resort
+        return 'less'
