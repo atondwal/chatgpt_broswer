@@ -36,8 +36,11 @@ class TreeManager(ActionHandler):
                 return ActionResult(True, refresh_tree=True)
             elif conv:
                 # Open conversation in editor
-                self._open_in_editor(conv)
-                return ActionResult(True)
+                try:
+                    self._open_in_editor(conv)
+                    return ActionResult(True, message="Opened in editor")
+                except Exception as e:
+                    return ActionResult(False, message=f"Failed to open editor: {e}")
                 
         elif action == "toggle":
             if context.selected_item:
@@ -206,19 +209,9 @@ class TreeManager(ActionHandler):
         del help_win
         
     def _open_in_editor(self, conversation) -> None:
-        """Open conversation in user's editor with progress indication."""
-        # Show immediate feedback
-        self.tui.status_message = "Preparing conversation..."
-        self.tui.draw()
-        
-        # Quick check for large conversations
-        msg_count = len(conversation.messages)
-        if msg_count > 100:
-            self.tui.status_message = f"Exporting {msg_count} messages..."
-            self.tui.draw()
-        
+        """Open conversation in user's editor."""
         try:
-            # Export conversation (now with caching and optimization)
+            # Export conversation to temp file
             content = export_conversation(conversation, format="markdown")
             
             # Create temp file with .md extension for syntax highlighting
@@ -229,8 +222,7 @@ class TreeManager(ActionHandler):
             # Get editor from environment or use sensible defaults
             editor = self._get_editor()
             
-            # Clear status and suspend curses
-            self.tui.status_message = ""
+            # Suspend curses temporarily
             import curses
             curses.endwin()
             
@@ -246,7 +238,6 @@ class TreeManager(ActionHandler):
             import curses
             curses.doupdate()
             self.tui.status_message = f"Error opening editor: {e}"
-            return
         finally:
             # Clean up temp file
             try:
