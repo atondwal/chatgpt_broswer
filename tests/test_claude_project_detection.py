@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.claude_loader import find_claude_project_for_cwd
+from src.core.claude_loader import find_claude_project_for_cwd, encode_path_like_claude
 
 
 class TestClaudeProjectDetection:
@@ -146,3 +146,99 @@ class TestClaudeProjectDetection:
                     result = find_claude_project_for_cwd()
                     # Should still return the project even if empty
                     assert result == str(project_dir.resolve())
+
+    def test_encode_path_like_claude(self):
+        """Test that path encoding matches Claude's encoding scheme."""
+        # Test basic path encoding
+        assert encode_path_like_claude(Path("/home/user/project")) == "-home-user-project"
+        
+        # Test path with underscores (converted to dashes)
+        assert encode_path_like_claude(Path("/home/user/my_project")) == "-home-user-my-project"
+        
+        # Test path with spaces (converted to dashes)
+        assert encode_path_like_claude(Path("/home/user/my project")) == "-home-user-my-project"
+        
+        # Test path with mixed special characters
+        assert encode_path_like_claude(Path("/home/user/my_cool-project")) == "-home-user-my-cool-project"
+        
+        # Test path with dots and other special chars
+        assert encode_path_like_claude(Path("/home/user/project.v2")) == "-home-user-project-v2"
+        
+        # Test path with multiple consecutive special chars
+        assert encode_path_like_claude(Path("/home/user/my___project")) == "-home-user-my-project"
+        
+        # Test path with trailing special chars
+        assert encode_path_like_claude(Path("/home/user/project_")) == "-home-user-project"
+        
+        # Test single directory
+        assert encode_path_like_claude(Path("/project")) == "-project"
+        
+        # Test root directory
+        assert encode_path_like_claude(Path("/")) == "-"
+        
+        # Test complex real-world example
+        assert encode_path_like_claude(Path("/home/user/my-app_v2.0 (dev)")) == "-home-user-my-app-v2-0-dev"
+
+    def test_find_claude_project_with_underscores(self):
+        """Test project detection works with underscores in directory names."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # Create fake ~/.claude/projects
+            projects_dir = temp_path / ".claude" / "projects"
+            projects_dir.mkdir(parents=True)
+            
+            # Create project directory with underscores (as Claude would encode it)
+            # Note: underscores are now converted to dashes in the new encoding
+            project_dir = projects_dir / "-home-user-my-awesome-project"
+            project_dir.mkdir()
+            
+            # Create a conversation file
+            conv_file = project_dir / "conv1.jsonl"
+            conv_file.write_text('{"type": "user", "content": "test"}\n')
+            
+            with patch('pathlib.Path.home') as mock_home:
+                mock_home.return_value = temp_path
+                with patch('pathlib.Path.cwd') as mock_cwd:
+                    # Test exact match
+                    mock_cwd.return_value = Path("/home/user/my_awesome_project")
+                    result = find_claude_project_for_cwd()
+                    assert result == str(project_dir.resolve())
+                    
+                    # Test subdirectory match
+                    mock_cwd.return_value = Path("/home/user/my_awesome_project/src/components")
+                    result = find_claude_project_for_cwd()
+                    assert result == str(project_dir.resolve())
+
+    def test_find_claude_project_with_various_special_chars(self):
+        """Test project detection works with various special characters."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # Create fake ~/.claude/projects
+            projects_dir = temp_path / ".claude" / "projects"
+            projects_dir.mkdir(parents=True)
+            
+            # Create project directories with various special characters (as Claude would encode them)
+            test_cases = [
+                ("/home/user/my project", "-home-user-my-project"),
+                ("/home/user/app.v2", "-home-user-app-v2"),
+                ("/home/user/my_app_v2", "-home-user-my-app-v2"),
+                ("/home/user/project (dev)", "-home-user-project-dev"),
+            ]
+            
+            for original_path, encoded_name in test_cases:
+                project_dir = projects_dir / encoded_name
+                project_dir.mkdir()
+                
+                # Create a conversation file
+                conv_file = project_dir / "conv1.jsonl"
+                conv_file.write_text('{"type": "user", "content": "test"}\n')
+                
+                with patch('pathlib.Path.home') as mock_home:
+                    mock_home.return_value = temp_path
+                    with patch('pathlib.Path.cwd') as mock_cwd:
+                        # Test exact match
+                        mock_cwd.return_value = Path(original_path)
+                        result = find_claude_project_for_cwd()
+                        assert result == str(project_dir.resolve()), f"Failed for {original_path} -> {encoded_name}"

@@ -92,13 +92,17 @@ def load_claude_conversation(file_path: str) -> Optional[Conversation]:
     # Generate title from first user message or project info
     title = generate_title(messages, project_name)
     
+    metadata = {'source': 'claude', 'file': file_path}
+    if project_name:
+        metadata['project'] = project_name
+    
     return Conversation(
         id=conv_id,
         title=title,
         messages=messages,
         create_time=first_timestamp,
         update_time=file_modified_time or last_timestamp,
-        metadata={'source': 'claude', 'file': file_path}
+        metadata=metadata
     )
 
 
@@ -266,6 +270,28 @@ def generate_title(messages: List[Message], project_name: Optional[str]) -> str:
     return "Claude conversation"
 
 
+def encode_path_like_claude(path: Path) -> str:
+    """Encode a path the same way Claude does for project directories."""
+    # Claude encodes paths by replacing special characters with dashes and adding a leading -
+    # e.g., /home/user/my_project -> -home-user-my-project
+    # e.g., /home/user/project with spaces -> -home-user-project-with-spaces
+    path_str = str(path)
+    if path_str.startswith('/'):
+        path_str = path_str[1:]  # Remove leading slash
+    
+    # Replace filesystem-problematic characters with dashes
+    # This includes: / _ space . , ; : ! @ # $ % ^ & * ( ) + = [ ] { } | \ ` ~ ? < > "
+    import re
+    # Replace any sequence of non-alphanumeric, non-hyphen characters with a single dash
+    path_str = re.sub(r'[^a-zA-Z0-9-]+', '-', path_str)
+    # Clean up multiple consecutive dashes
+    path_str = re.sub(r'-+', '-', path_str)
+    # Remove trailing dashes
+    path_str = path_str.strip('-')
+    
+    return '-' + path_str
+
+
 def find_claude_project_for_cwd() -> Optional[str]:
     """Find the Claude project that contains the current working directory."""
     cwd = Path.cwd().resolve()
@@ -274,33 +300,20 @@ def find_claude_project_for_cwd() -> Optional[str]:
     if not projects_dir.exists():
         return None
     
-    # Find the project whose original path is the longest common prefix with cwd
-    best_match = None
-    best_match_length = 0
+    # Get all existing project names
+    existing_projects = {p.name for p in projects_dir.iterdir() if p.is_dir()}
     
-    for project_dir in projects_dir.iterdir():
-        if project_dir.is_dir():
-            # Decode the project name back to the original path
-            # Claude uses dashes to encode path separators
-            project_name = project_dir.name
-            if project_name.startswith('-'):
-                # Convert "-home-atondwal-playground" to "/home/atondwal/playground"
-                original_path = Path('/' + project_name[1:].replace('-', '/'))
-            else:
-                # Fallback for projects without leading dash
-                original_path = Path(project_name.replace('-', '/'))
-            
-            # Check if cwd is under this project's original path
-            try:
-                cwd.relative_to(original_path)
-                # If we get here, cwd is under original_path
-                path_length = len(original_path.parts)
-                if path_length > best_match_length:
-                    best_match = str(project_dir.resolve())
-                    best_match_length = path_length
-            except ValueError:
-                # cwd is not under this project path
-                continue
+    # Find the deepest matching parent directory
+    # Start with cwd and work up the directory tree
+    current_path = cwd
+    best_match = None
+    
+    while current_path != current_path.parent:
+        encoded_path = encode_path_like_claude(current_path)
+        if encoded_path in existing_projects:
+            best_match = str(projects_dir / encoded_path)
+            break
+        current_path = current_path.parent
     
     return best_match
 
