@@ -1,20 +1,58 @@
-# Project Context for Claude
+# CLAUDE.md
 
-This file contains important context about the ChatGPT Browser project that should be preserved across Claude sessions.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
 ChatGPT Browser is a simple, fast terminal-based tool for browsing and organizing ChatGPT and Claude conversation history. The codebase emphasizes simplicity and self-documenting code.
 
+## Development Commands
+
+### Testing
+```bash
+# Run all tests
+pytest tests/test_simple.py -v
+
+# Run specific test
+pytest tests/test_simple.py::TestSimpleLoader::test_load_basic_conversation -v
+
+# Run tests by marker
+pytest -m unit        # Unit tests only
+pytest -m integration # Integration tests
+pytest -m tui        # TUI-specific tests
+```
+
+### Code Formatting
+```bash
+# Format code with Black (line-length: 120)
+black src/ scripts/ tests/
+
+# Sort imports
+isort src/ scripts/ tests/
+```
+
+### Installation for Development
+```bash
+# Install in development mode
+pip install -e .
+
+# Entry points available after installation
+cgpt      # CLI interface
+cgpt-tui  # Terminal UI interface
+```
+
 ## Key Design Principles
 
 1. **Simplicity First**: No unnecessary abstractions or complex inheritance
 2. **Self-Documenting Code**: Clear names and obvious intent
-3. **Minimal Dependencies**: Each module stands alone
+3. **Minimal Dependencies**: Each module stands alone (no external dependencies beyond Python standard library)
 4. **Direct Implementation**: Avoid over-engineering
 
-## Project Structure
+## Architecture Overview
 
+The codebase was significantly simplified from 7,900 lines to ~1,500 lines while improving modularity:
+
+### Project Structure
 ```
 chatgpt_browser/
 ├── scripts/              # Entry points
@@ -30,52 +68,37 @@ chatgpt_browser/
 └── data/samples/        # Sample data
 ```
 
-## Recent Updates
+### TUI Architecture (Action-Based System)
+The TUI uses a modular action-based architecture:
 
-### Refactoring (2024)
-The codebase was significantly refactored to improve modularity:
-1. **Action Registration System**: Managers now register their actions with the TUI instead of having all logic in tui.py
-2. **Modular Managers**: Separate managers for selection, search, operations, actions, and tree operations
-3. **Reduced File Sizes**: TUI.py reduced from 1073 to 545 lines (49% reduction)
+1. **Base Classes**:
+   - `ActionHandler`: Base class for all managers
+   - `ActionContext`: Passes state between components
+   - `ActionResult`: Standardized return type
 
-### Claude Support (2024)
-Added support for browsing Claude Code conversation history:
-1. **JSONL Format**: Claude stores conversations as JSONL files (one JSON object per line)
-2. **Project Structure**: Conversations organized by project in `~/.claude/projects/<PROJECT_NAME>/`
-3. **Auto-detection**: Format is automatically detected based on file extension or directory
-4. **Unified Interface**: Both ChatGPT and Claude conversations use the same UI
+2. **Managers** (each handles specific concerns):
+   - `SelectionManager`: Visual mode and multi-select operations
+   - `SearchManager`: Search and filter functionality
+   - `OperationsManager`: CRUD operations on conversations
+   - `ActionManager`: Undo/redo/copy/paste functionality
+   - `TreeManager`: Tree navigation and help display
 
-## Key Components
+3. **Action Flow**:
+   - `tree_view.py` handles input and returns action strings
+   - TUI dispatches actions to appropriate managers
+   - Managers update state and return results
 
-### TUI Architecture
-- `ActionHandler` base class for all managers
-- `ActionContext` passes state between components
-- `ActionResult` standardized return type
-- Managers: SelectionManager, SearchManager, OperationsManager, ActionManager, TreeManager
+### Data Format Support
 
-### Data Loading
-- `loader.py`: Auto-detects format and routes to appropriate loader
-- `claude_loader.py`: Handles Claude JSONL format
-- Unified `Conversation` and `Message` models for both formats
+1. **ChatGPT Format**: JSON export from ChatGPT
+2. **Claude Format**: JSONL files in `~/.claude/projects/<PROJECT_NAME>/`
+3. **Auto-detection**: Format detected by file extension or directory structure
+4. **Unified Model**: Both formats use same `Conversation` and `Message` models
 
-### Features
-- Vim-like navigation (h/j/k/l, gg/G, etc.)
-- Visual mode selection
-- Tree organization with folders
-- Search and filter functionality
-- Undo/redo support
-- Multi-select operations
-
-## Testing
-
-Run tests with: `pytest tests/test_simple.py -v`
-
-All tests should pass before committing changes.
-
-## Common Tasks
+## Common Development Tasks
 
 ### Adding a New Keybinding
-1. Add the key handling in `tree_view.py` `handle_input()` method
+1. Add key handling in `tree_view.py` `handle_input()` method
 2. Return an action string (e.g., "new_action")
 3. Add handler in appropriate manager's `can_handle()` and `handle()` methods
 4. Update help text in `TreeManager.show_help()`
@@ -85,13 +108,20 @@ All tests should pass before committing changes.
 2. Implement `can_handle()` and `handle()` methods
 3. Register in TUI's `run()` method in the `action_handlers` list
 
-## Code Style
+### Testing Changes
+- Always run `pytest tests/test_simple.py -v` before committing
+- Add tests for new functionality in appropriate test files
+- Use temporary files for test isolation
+
+## Code Style Guidelines
 
 - No comments unless absolutely necessary
 - Clear, descriptive names
-- Keep methods short and focused
+- Keep methods under 50 lines
 - Use type hints for clarity
 - Follow existing patterns in the codebase
+- Format with Black (line-length: 120)
+- Sort imports with isort
 
 ## Important Notes
 
@@ -99,3 +129,20 @@ All tests should pass before committing changes.
 - The project uses curses for terminal UI
 - No external dependencies beyond Python standard library
 - Designed to work with ChatGPT's conversation export format
+- Claude support requires `claude_loader.py` (currently missing in some test scenarios)
+
+## Recent Updates
+
+### Modular Refactoring (2024)
+- Reduced TUI.py from 1073 to 545 lines (49% reduction)
+- Action registration system allows managers to self-register
+- Improved separation of concerns
+
+### Claude Support (2024)
+- Added JSONL format support for Claude Code conversations
+- Project-based organization in `~/.claude/projects/`
+- Unified interface for both ChatGPT and Claude formats
+
+## Development Workflow
+
+- After every change, test and commit. If you're on a feature branch, see if you need to merge in master and fix anything.
