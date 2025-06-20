@@ -173,3 +173,53 @@ class TestCLIEdgeCases:
         with pytest.raises(FileNotFoundError):
             # The loader doesn't handle missing files gracefully
             list_conversations('nonexistent_file.json')
+
+
+class TestCLIClaudeProjectDetection:
+    """Test CLI Claude project auto-detection functionality."""
+    
+    def test_main_no_args_with_claude_project(self):
+        """Test main function with no arguments auto-detects Claude project."""
+        with patch('sys.argv', ['cli']):
+            with patch('src.cli.cli.find_claude_project_for_cwd') as mock_find:
+                with patch('src.cli.cli.list_conversations') as mock_list:
+                    with patch('pathlib.Path.exists', return_value=True):
+                        mock_find.return_value = '/fake/project/path'
+                        main()
+                        mock_list.assert_called_once_with('/fake/project/path', format='claude')
+    
+    def test_main_no_args_no_claude_project(self):
+        """Test main function with no arguments falls back to project picker."""
+        with patch('sys.argv', ['cli']):
+            with patch('src.cli.cli.find_claude_project_for_cwd') as mock_find:
+                with patch('src.cli.cli.list_claude_projects_cmd') as mock_projects:
+                    mock_find.return_value = None
+                    main()
+                    mock_projects.assert_called_once()
+    
+    def test_main_no_args_with_claude_project_list_command(self):
+        """Test main function with list command auto-detects Claude project."""
+        with patch('sys.argv', ['cli', 'list']):
+            with patch('src.cli.cli.find_claude_project_for_cwd') as mock_find:
+                with patch('src.cli.cli.list_conversations') as mock_list:
+                    with patch('pathlib.Path.exists', return_value=True):
+                        mock_find.return_value = '/fake/project/path'
+                        main()
+                        mock_list.assert_called_once_with('/fake/project/path', 20, format='claude')
+    
+    def test_main_explicit_file_overrides_detection(self):
+        """Test that explicitly providing a file path overrides auto-detection."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump([], f)
+            test_file = f.name
+        
+        try:
+            with patch('sys.argv', ['cli', test_file, 'list']):
+                with patch('src.cli.cli.find_claude_project_for_cwd') as mock_find:
+                    with patch('src.cli.cli.list_conversations') as mock_list:
+                        mock_find.return_value = '/fake/project/path'
+                        main()
+                        # Should use the explicit file, not the detected project
+                        mock_list.assert_called_once_with(test_file, 20, format='auto')
+        finally:
+            Path(test_file).unlink(missing_ok=True)

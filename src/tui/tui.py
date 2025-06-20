@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List
 
 from src.core.loader import load_conversations
+from src.core.claude_loader import find_claude_project_for_cwd, list_claude_projects
 from src.core.exporter import export_conversation as export_conv
 from src.tree.tree import ConversationTree
 from src.tui.input import get_input, confirm, select_folder
@@ -454,12 +455,37 @@ class TUI:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="ChatGPT History Browser")
-    parser.add_argument("conversations_file", help="Path to conversations file or Claude project")
+    parser.add_argument("conversations_file", nargs="?", help="Path to conversations file or Claude project")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--format", choices=["auto", "chatgpt", "claude"], default="auto",
                        help="Conversation format (auto-detected by default)")
     
     args = parser.parse_args()
+    
+    # Auto-detect Claude project if no file specified
+    if not args.conversations_file:
+        # Check if we're in a Claude project directory
+        claude_project = find_claude_project_for_cwd()
+        if claude_project:
+            args.conversations_file = claude_project
+            args.format = "claude"
+        else:
+            # Fall back to showing Claude project picker
+            projects = list_claude_projects()
+            if not projects:
+                print("No Claude projects found and no conversation file specified.")
+                print("Please provide a conversation file path or create a Claude project.")
+                sys.exit(1)
+            
+            print("No conversation file specified. Available Claude projects:")
+            print("=" * 50)
+            for i, project in enumerate(projects, 1):
+                name = project['name'].lstrip('-').replace('-', '/')
+                count = project['conversation_count']
+                print(f"{i:2}. {name} ({count} conversations)")
+            
+            print("\nUse: cgpt-tui ~/.claude/projects/<PROJECT_NAME>")
+            sys.exit(0)
     
     if not Path(args.conversations_file).exists():
         print(f"File not found: {args.conversations_file}")

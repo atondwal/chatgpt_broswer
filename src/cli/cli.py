@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.core.loader import load_conversations
-from src.core.claude_loader import list_claude_projects
+from src.core.claude_loader import list_claude_projects, find_claude_project_for_cwd
 from src.core.time_utils import format_relative_time
 from src.core.exporter import export_conversation as export_conv
 
@@ -135,7 +135,6 @@ def main():
     parser.add_argument(
         "conversations_file",
         nargs="?",
-        default=str(Path.home() / ".chatgpt" / "conversations.json"),
         help="Path to conversations file (JSON/JSONL) or Claude project directory"
     )
     
@@ -186,6 +185,18 @@ def main():
     if args.command == "projects":
         list_claude_projects_cmd()
         return
+    
+    # Auto-detect Claude project if no file specified
+    if not args.conversations_file:
+        # Check if we're in a Claude project directory
+        claude_project = find_claude_project_for_cwd()
+        if claude_project:
+            args.conversations_file = claude_project
+            args.format = "claude"
+        else:
+            # Fall back to showing Claude project picker
+            list_claude_projects_cmd()
+            return
     
     # Check file exists
     if not Path(args.conversations_file).exists():

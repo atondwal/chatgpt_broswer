@@ -262,6 +262,45 @@ def generate_title(messages: List[Message], project_name: Optional[str]) -> str:
     return "Claude conversation"
 
 
+def find_claude_project_for_cwd() -> Optional[str]:
+    """Find the Claude project that contains the current working directory."""
+    cwd = Path.cwd().resolve()
+    projects_dir = Path.home() / ".claude" / "projects"
+    
+    if not projects_dir.exists():
+        return None
+    
+    # Find the project whose original path is the longest common prefix with cwd
+    best_match = None
+    best_match_length = 0
+    
+    for project_dir in projects_dir.iterdir():
+        if project_dir.is_dir():
+            # Decode the project name back to the original path
+            # Claude uses dashes to encode path separators
+            project_name = project_dir.name
+            if project_name.startswith('-'):
+                # Convert "-home-atondwal-playground" to "/home/atondwal/playground"
+                original_path = Path('/' + project_name[1:].replace('-', '/'))
+            else:
+                # Fallback for projects without leading dash
+                original_path = Path(project_name.replace('-', '/'))
+            
+            # Check if cwd is under this project's original path
+            try:
+                cwd.relative_to(original_path)
+                # If we get here, cwd is under original_path
+                path_length = len(original_path.parts)
+                if path_length > best_match_length:
+                    best_match = str(project_dir.resolve())
+                    best_match_length = path_length
+            except ValueError:
+                # cwd is not under this project path
+                continue
+    
+    return best_match
+
+
 def list_claude_projects() -> List[Dict[str, Any]]:
     """List all Claude projects with metadata."""
     projects_dir = Path.home() / ".claude" / "projects"
