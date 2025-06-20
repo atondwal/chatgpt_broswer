@@ -61,8 +61,8 @@ def load_claude_conversation(file_path: str) -> Optional[Conversation]:
                 except json.JSONDecodeError:
                     continue
                 
-                # Extract session info from first entry
-                if session_id is None and 'sessionId' in data:
+                # Extract session info - use the most recent sessionId found
+                if 'sessionId' in data:
                     session_id = data['sessionId']
                 
                 # Track timestamps
@@ -85,8 +85,9 @@ def load_claude_conversation(file_path: str) -> Optional[Conversation]:
     if not messages:
         return None
     
-    # Use session ID as conversation ID, or fallback to filename
-    conv_id = session_id or Path(file_path).stem
+    # Use filename as session ID - this is what claude --resume expects
+    filename_session_id = Path(file_path).stem
+    conv_id = filename_session_id
     
     # Generate title from first user message or project info
     title = generate_title(messages, project_name)
