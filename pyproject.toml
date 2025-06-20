@@ -2,6 +2,11 @@
 requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["chatgpt_browser*"]
+exclude = ["tests*", "docs*", "data*"]
+
 [project]
 name = "chatgpt-browser"
 version = "0.1.0"
@@ -12,11 +17,14 @@ license = {text = "MIT"}
 authors = [
     {name = "ChatGPT Browser Contributors"},
 ]
-dependencies = []
+dependencies = [
+    "typing-extensions",
+    "psutil"
+]
 
 [project.scripts]
-cgpt = "src.cli.cli:main"
-cgpt-tui = "src.tui.tui:main"
+cgpt = "chatgpt_browser.cli.cli:main"
+cgpt-tui = "chatgpt_browser.tui.tui:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

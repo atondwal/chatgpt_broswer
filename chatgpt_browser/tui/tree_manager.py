@@ -5,8 +5,8 @@ import os
 import tempfile
 import subprocess
 from typing import Optional, Any
-from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
-from src.core.exporter import export_conversation
+from chatgpt_browser.tui.action_handler import ActionHandler, ActionContext, ActionResult
+from chatgpt_browser.core.exporter import export_conversation
 
 
 class TreeManager(ActionHandler):
@@ -117,7 +117,7 @@ class TreeManager(ActionHandler):
                               
         elif action == "refresh":
             try:
-                from src.core.loader import load_conversations
+                from chatgpt_browser.core.loader import load_conversations
                 context.tui.conversations = load_conversations(context.tui.conversations_file)
                 context.tui.filtered_conversations = context.tui.conversations
                 message = f"Refreshed {len(context.tui.conversations)} conversations"

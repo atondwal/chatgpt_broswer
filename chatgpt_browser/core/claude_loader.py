@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from src.core.models import Conversation, Message, MessageRole
-from src.core.logging_config import get_logger
+from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from chatgpt_browser.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

@@ -4,11 +4,11 @@
 import curses
 from typing import List, Optional, Any, Dict
 
-from src.core.models import Conversation
-from src.tree.tree import ConversationTree
-from src.tui.action_handler import ActionContext, ActionResult
-from src.tui.tui_state import UIState, ViewMode
-from src.core.logging_config import get_logger
+from chatgpt_browser.core.models import Conversation
+from chatgpt_browser.tree.tree import ConversationTree
+from chatgpt_browser.tui.action_handler import ActionContext, ActionResult
+from chatgpt_browser.tui.tui_state import UIState, ViewMode
+from chatgpt_browser.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

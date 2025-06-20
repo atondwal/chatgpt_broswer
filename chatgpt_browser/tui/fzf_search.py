@@ -5,8 +5,8 @@ import subprocess
 import tempfile
 import os
 from typing import List, Tuple, Optional, Any
-from src.tree.tree import TreeNode
-from src.core.models import Conversation
+from chatgpt_browser.tree.tree import TreeNode
+from chatgpt_browser.core.models import Conversation
 
 
 class FZFSearch:
@@ -48,7 +48,7 @@ class FZFSearch:
         for i, (node, conv, depth) in enumerate(tree_items):
             if not node.is_folder and conv:  # Only include conversations, not folders
                 # Format: "title | created | modified | messages"
-                from src.core.time_utils import format_relative_time
+                from chatgpt_browser.core.time_utils import format_relative_time
                 # Convert datetime to timestamp if needed
                 create_ts = conv.create_time.timestamp() if hasattr(conv.create_time, 'timestamp') else conv.create_time
                 update_ts = conv.update_time.timestamp() if hasattr(conv.update_time, 'timestamp') else conv.update_time
@@ -143,7 +143,7 @@ class FZFSearch:
                 # Conversation entry
                 icon = "💬"
                 if conv:
-                    from src.core.time_utils import format_relative_time
+                    from chatgpt_browser.core.time_utils import format_relative_time
                     # Convert datetime to timestamp if needed
                     update_ts = conv.update_time.timestamp() if hasattr(conv.update_time, 'timestamp') else conv.update_time
                     modified = format_relative_time(update_ts)

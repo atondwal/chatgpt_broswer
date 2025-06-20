@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.logging_config import setup_logging, get_logger
+from chatgpt_browser.core.logging_config import setup_logging, get_logger
 
 
 class TestLoggingConfig:
@@ -127,10 +127,10 @@ class TestLoggingIntegration:
             setup_logging(level="DEBUG", log_file=str(log_file))
             
             # Import after setting up logging
-            from src.core.claude_loader import logger as claude_logger
+            from chatgpt_browser.core.claude_loader import logger as claude_logger
             
             # Test that the logger is properly configured
-            assert claude_logger.name == "chatgpt_browser.src.core.claude_loader"
+            assert claude_logger.name == "chatgpt_browser.chatgpt_browser.core.claude_loader"
             assert claude_logger.getEffectiveLevel() == logging.DEBUG
     
     def test_tree_logging(self):
@@ -140,7 +140,7 @@ class TestLoggingIntegration:
             setup_logging(level="DEBUG", log_file=str(log_file))
             
             # Test that debug messages are logged when tree loading fails
-            from src.tree.tree import ConversationTree
+            from chatgpt_browser.tree.tree import ConversationTree
             
             # Create tree with non-existent file - should trigger debug log
             tree = ConversationTree("/nonexistent/path")

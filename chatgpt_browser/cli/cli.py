@@ -6,12 +6,12 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from src.core.loader import load_conversations
-from src.core.claude_loader import list_claude_projects, find_claude_project_for_cwd
-from src.core.time_utils import format_relative_time
-from src.core.exporter import export_conversation as export_conv
-from src.core.logging_config import setup_logging, get_logger
-from src.core.validation import validate_project_selection, validate_conversation_number, validate_file_path
+from chatgpt_browser.core.loader import load_conversations
+from chatgpt_browser.core.claude_loader import list_claude_projects, find_claude_project_for_cwd
+from chatgpt_browser.core.time_utils import format_relative_time
+from chatgpt_browser.core.exporter import export_conversation as export_conv
+from chatgpt_browser.core.logging_config import setup_logging, get_logger
+from chatgpt_browser.core.validation import validate_project_selection, validate_conversation_number, validate_file_path
 
 
 def list_conversations(file_path: str, count: int = 20, format: str = "auto") -> None:

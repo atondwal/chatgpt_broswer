@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.core.claude_loader import find_claude_project_for_cwd
+from chatgpt_browser.core.claude_loader import find_claude_project_for_cwd
 
 
 class TestClaudeProjectDetection:

@@ -4,8 +4,8 @@
 import curses
 from datetime import datetime
 from typing import List, Tuple, Optional
-from src.tree.tree import TreeNode
-from src.core.time_utils import format_relative_time
+from chatgpt_browser.tree.tree import TreeNode
+from chatgpt_browser.core.time_utils import format_relative_time
 
 
 class TreeView:

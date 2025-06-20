@@ -6,11 +6,11 @@ import json
 import pytest
 from pathlib import Path
 
-from src.core.loader import load_conversations, extract_content
-from src.tree.tree import ConversationTree, TreeNode
-from src.core.models import Conversation, Message, MessageRole
-from src.tui.tree_view import TreeView
-from src.tui.tui import TUI
+from chatgpt_browser.core.loader import load_conversations, extract_content
+from chatgpt_browser.tree.tree import ConversationTree, TreeNode
+from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from chatgpt_browser.tui.tree_view import TreeView
+from chatgpt_browser.tui.tui import TUI
 import curses
 import time
 from unittest.mock import Mock, patch
@@ -389,8 +389,8 @@ class TestTUIEnhancements:
         self.tui.tree_items = []
         
         # Initialize managers that are normally created in run()
-        from src.tui.tree_manager import TreeManager
-        from src.tui.operations_manager import OperationsManager
+        from chatgpt_browser.tui.tree_manager import TreeManager
+        from chatgpt_browser.tui.operations_manager import OperationsManager
         self.tui.tree_manager = TreeManager(self.tui.tree, self.tui)
         # Create a mock stdscr for operations_manager
         self.tui.stdscr = Mock()
@@ -403,7 +403,7 @@ class TestTUIEnhancements:
         self.tui.tree_view.get_selected = Mock(return_value=mock_item)
         
         # Use action handler directly
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('y'), "copy")
         result = self.tui.action_manager.handle("copy", context)
         
@@ -416,7 +416,7 @@ class TestTUIEnhancements:
     def test_paste_item(self):
         """Test pasting item."""
         # No clipboard
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('p'), "paste")
         result = self.tui.action_manager.handle("paste", context)
         assert result is not None
@@ -430,7 +430,7 @@ class TestTUIEnhancements:
     
     def test_refresh_conversations(self):
         """Test refreshing conversations from file."""
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, 116, "refresh")  # F5 key
         result = self.tui.tree_manager.handle("refresh", context)
         
@@ -440,7 +440,7 @@ class TestTUIEnhancements:
     
     def test_filter_folders(self):
         """Test showing only folders."""
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('1'), "filter_folders")
         result = self.tui.tree_manager.handle("filter_folders", context)
         
@@ -454,7 +454,7 @@ class TestTUIEnhancements:
         self.tui.filtered_conversations = []
         
         # Then show all
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('A'), "show_all")
         result = self.tui.tree_manager.handle("show_all", context)
         
@@ -469,7 +469,7 @@ class TestTUIEnhancements:
         folder2_id = self.tui.tree.create_folder("Folder 2", parent_id=folder1_id)
         
         # Test collapse all (depth 0)
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('0'), "expand_depth_0")
         result = self.tui.tree_manager.handle("expand_depth_0", context)
         assert result is not None
@@ -487,7 +487,7 @@ class TestTUIEnhancements:
     def test_implemented_actions(self):
         """Test actually implemented action messages."""
         # Test undo with empty stack
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('u'), "undo")
         result = self.tui.action_manager.handle("undo", context)
         assert result is not None
@@ -514,7 +514,7 @@ class TestTUIEnhancements:
     def test_indent_outdent_items(self):
         """Test indent/outdent operations."""
         # No items selected
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, 9, "indent")  # Tab key
         result = self.tui.operations_manager.handle("indent", context)
         assert result is not None
@@ -543,7 +543,7 @@ class TestTUIEnhancements:
     
     def test_quick_filter(self):
         """Test quick filter activation."""
-        from src.tui.tui import ViewMode
+        from chatgpt_browser.tui.tui import ViewMode
         
         # _quick_filter is still called directly in TUI
         self.tui._quick_filter()
@@ -566,7 +566,7 @@ class TestTUIEnhancements:
         
         # Test indent with undo
         original_parent = self.tui.tree.nodes[conv_id].parent_id
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, 9, "indent")
         result = self.tui.operations_manager.handle("indent", context)
         
@@ -624,7 +624,7 @@ class TestTUIEnhancements:
         orig_parent2 = self.tui.tree.nodes[conv_id2].parent_id
         
         # Perform indent
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, 9, "indent")
         result = self.tui.operations_manager.handle("indent", context)
         
@@ -697,7 +697,7 @@ class TestTUIEnhancements:
     
     def test_ctrl_g_in_search_mode(self):
         """Test Ctrl+G behavior in search mode."""
-        from src.tui.search_overlay import SearchOverlay
+        from chatgpt_browser.tui.search_overlay import SearchOverlay
         
         # Create test data
         self.tui.tree.add_conversation("test1", "Test Conversation 1")
@@ -724,7 +724,7 @@ class TestTUIEnhancements:
     
     def test_ctrl_w_delete_word(self):
         """Test Ctrl+W word deletion in search mode."""
-        from src.tui.search_overlay import SearchOverlay
+        from chatgpt_browser.tui.search_overlay import SearchOverlay
         
         overlay = SearchOverlay(Mock(), 0, 0, 80)
         overlay.activate()
@@ -759,7 +759,7 @@ class TestTUIEnhancements:
     
     def test_ctrl_w_with_cursor_in_middle(self):
         """Test Ctrl+W behavior when cursor is in middle of text."""
-        from src.tui.search_overlay import SearchOverlay
+        from chatgpt_browser.tui.search_overlay import SearchOverlay
         
         overlay = SearchOverlay(Mock(), 0, 0, 80)
         overlay.activate()
@@ -899,7 +899,7 @@ class TestTUIEnhancements:
     def test_filter_vs_search_modes(self):
         """Test that f activates filter mode and / activates search mode."""
         # Create test data by adding to both tree and conversations list
-        from src.core.models import Conversation
+        from chatgpt_browser.core.models import Conversation
         python_conv1 = Conversation("python1", "Python Tutorial", [], create_time=1234567890)
         java_conv = Conversation("java1", "Java Guide", [], create_time=1234567891)
         python_conv2 = Conversation("python2", "Advanced Python", [], create_time=1234567892)
@@ -970,9 +970,9 @@ class TestTUIEnhancements:
         # Mock the input for folder name and stdscr
         from unittest.mock import patch, Mock
         self.tui.stdscr.getmaxyx.return_value = (24, 80)  # Mock terminal size
-        with patch('src.tui.operations_manager.get_input', return_value="Test Folder"):
+        with patch('chatgpt_browser.tui.operations_manager.get_input', return_value="Test Folder"):
             # Create folder - should move selected items into it
-            from src.tui.action_handler import ActionContext
+            from chatgpt_browser.tui.action_handler import ActionContext
             context = ActionContext(self.tui, ord('n'), "new_folder")
             result = self.tui.operations_manager.handle("new_folder", context)
             
@@ -1006,9 +1006,9 @@ class TestTUIEnhancements:
         # Mock the input for folder name and stdscr
         from unittest.mock import patch, Mock
         self.tui.stdscr.getmaxyx.return_value = (24, 80)  # Mock terminal size
-        with patch('src.tui.operations_manager.get_input', return_value="Empty Folder"):
+        with patch('chatgpt_browser.tui.operations_manager.get_input', return_value="Empty Folder"):
             # Create folder without selection
-            from src.tui.action_handler import ActionContext
+            from chatgpt_browser.tui.action_handler import ActionContext
             context = ActionContext(self.tui, ord('n'), "new_folder")
             result = self.tui.operations_manager.handle("new_folder", context)
         
@@ -1038,7 +1038,7 @@ class TestTUIEnhancements:
         self.tui.tree_view.get_selected = Mock(return_value=mock_item)
         
         # Test indent - should move current item into folder
-        from src.tui.action_handler import ActionContext
+        from chatgpt_browser.tui.action_handler import ActionContext
         context = ActionContext(self.tui, ord('>'), "indent")
         result = self.tui.operations_manager.handle("indent", context)
         

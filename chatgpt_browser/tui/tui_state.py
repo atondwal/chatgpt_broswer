@@ -5,9 +5,9 @@ from enum import Enum
 from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
 
-from src.core.models import Conversation
-from src.tree.tree import TreeNode, ConversationTree
-from src.core.logging_config import get_logger
+from chatgpt_browser.core.models import Conversation
+from chatgpt_browser.tree.tree import TreeNode, ConversationTree
+from chatgpt_browser.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -57,7 +57,7 @@ class TUIInitializer:
             Tuple of (conversations, tree)
         """
         try:
-            from src.core.loader import load_conversations
+            from chatgpt_browser.core.loader import load_conversations
             
             conversations = load_conversations(self.conversations_file, format=self.format)
             tree = ConversationTree(self.conversations_file)
@@ -132,12 +132,12 @@ class ManagerRegistry:
         Returns:
             List of initialized managers
         """
-        from src.tui.selection_manager import SelectionManager
-        from src.tui.search_manager import SearchManager
-        from src.tui.action_manager import ActionManager
-        from src.tui.fzf_search import FZFSearch
-        from src.tui.operations_manager import OperationsManager
-        from src.tui.tree_manager import TreeManager
+        from chatgpt_browser.tui.selection_manager import SelectionManager
+        from chatgpt_browser.tui.search_manager import SearchManager
+        from chatgpt_browser.tui.action_manager import ActionManager
+        from chatgpt_browser.tui.fzf_search import FZFSearch
+        from chatgpt_browser.tui.operations_manager import OperationsManager
+        from chatgpt_browser.tui.tree_manager import TreeManager
         
         try:
             # Initialize managers that don't need stdscr

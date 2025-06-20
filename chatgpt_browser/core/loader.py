@@ -4,11 +4,11 @@
 import json
 import os
 from typing import List, Dict, Any
-from src.core.models import Conversation, Message, MessageRole
-from src.core.claude_loader import load_claude_conversations, load_claude_conversation
-from src.core.lazy_loader import LazyConversationLoader, ConversationMetadata
-from src.core.performance import get_performance_monitor, enable_performance_monitoring, ProgressIndicator
-from src.core.logging_config import get_logger
+from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from chatgpt_browser.core.claude_loader import load_claude_conversations, load_claude_conversation
+from chatgpt_browser.core.lazy_loader import LazyConversationLoader, ConversationMetadata
+from chatgpt_browser.core.performance import get_performance_monitor, enable_performance_monitoring, ProgressIndicator
+from chatgpt_browser.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

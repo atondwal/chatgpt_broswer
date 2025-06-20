@@ -8,7 +8,7 @@ Defines the fundamental data structures used throughout the application.
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from src.core.type_definitions import MessageDict, ConversationDict, Timestamp
+from chatgpt_browser.core.type_definitions import MessageDict, ConversationDict, Timestamp
 
 
 class MessageRole(Enum):

@@ -6,7 +6,7 @@ import logging
 from contextlib import contextmanager
 from typing import Generator, Any
 
-from src.core.logging_config import get_logger
+from chatgpt_browser.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

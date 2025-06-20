@@ -8,11 +8,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.core.models import Conversation, Message, MessageRole
-from src.tree.tree import ConversationTree
-from src.tui.tui_state import UIState, ViewMode, TUIInitializer, ManagerRegistry, validate_tui_environment
-from src.tui.tui_utils import ActionDispatcher, TreeUpdater, create_action_context
-from src.tui.action_handler import ActionResult
+from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from chatgpt_browser.tree.tree import ConversationTree
+from chatgpt_browser.tui.tui_state import UIState, ViewMode, TUIInitializer, ManagerRegistry, validate_tui_environment
+from chatgpt_browser.tui.tui_utils import ActionDispatcher, TreeUpdater, create_action_context
+from chatgpt_browser.tui.action_handler import ActionResult
 
 
 class TestUIState:
@@ -79,7 +79,7 @@ class TestTUIInitializer:
         assert initializer.debug is True
         assert initializer.format == "claude"
     
-    @patch('src.core.loader.load_conversations')
+    @patch('chatgpt_browser.core.loader.load_conversations')
     def test_initialize_data_success(self, mock_load):
         """Test successful data initialization."""
         mock_load.return_value = self.test_conversations
@@ -92,7 +92,7 @@ class TestTUIInitializer:
             assert isinstance(tree, ConversationTree)
             mock_load.assert_called_once_with(tmpdir, format="auto")
     
-    @patch('src.core.loader.load_conversations')
+    @patch('chatgpt_browser.core.loader.load_conversations')
     def test_initialize_data_failure(self, mock_load):
         """Test data initialization failure."""
         mock_load.side_effect = Exception("Load failed")
@@ -146,12 +146,12 @@ class TestManagerRegistry:
         registry = ManagerRegistry()
         assert len(registry.managers) == 0
     
-    @patch('src.tui.selection_manager.SelectionManager')
-    @patch('src.tui.search_manager.SearchManager') 
-    @patch('src.tui.action_manager.ActionManager')
-    @patch('src.tui.fzf_search.FZFSearch')
-    @patch('src.tui.operations_manager.OperationsManager')
-    @patch('src.tui.tree_manager.TreeManager')
+    @patch('chatgpt_browser.tui.selection_manager.SelectionManager')
+    @patch('chatgpt_browser.tui.search_manager.SearchManager') 
+    @patch('chatgpt_browser.tui.action_manager.ActionManager')
+    @patch('chatgpt_browser.tui.fzf_search.FZFSearch')
+    @patch('chatgpt_browser.tui.operations_manager.OperationsManager')
+    @patch('chatgpt_browser.tui.tree_manager.TreeManager')
     def test_register_managers_success(self, mock_tree_mgr, mock_ops_mgr, mock_fzf, 
                                      mock_action_mgr, mock_search_mgr, mock_sel_mgr):
         """Test successful manager registration."""

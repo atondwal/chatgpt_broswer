@@ -31,16 +31,16 @@ pytest -m tui        # TUI-specific tests
 ### Code Formatting
 ```bash
 # Format code with Black (line-length: 120)
-black src/ scripts/ tests/
+black chatgpt_browser/ tests/
 
 # Sort imports
-isort src/ scripts/ tests/
+isort chatgpt_browser/ tests/
 ```
 
 ### Installation for Development
 ```bash
-# Install in development mode
-pip install -e .
+# Install in development mode (use pipx for isolation)
+pipx install --editable .
 
 # Entry points available after installation
 cgpt      # CLI interface
@@ -61,10 +61,7 @@ The codebase was significantly simplified from 7,900 lines to ~1,500 lines while
 ### Project Structure
 ```
 chatgpt_browser/
-├── scripts/              # Entry points
-│   ├── cgpt.py          # CLI entry point
-│   └── cgpt-tui.py      # TUI entry point
-├── src/
+├── chatgpt_browser/     # Main package
 │   ├── core/            # Data models and loading
 │   ├── tree/            # Tree organization logic
 │   ├── tui/             # Terminal UI components
@@ -110,7 +107,7 @@ The TUI uses a modular action-based architecture:
 4. Update help text in `TreeManager.show_help()`
 
 ### Adding a New Manager
-1. Create new file in `src/tui/` inheriting from `ActionHandler`
+1. Create new file in `chatgpt_browser/tui/` inheriting from `ActionHandler`
 2. Implement `can_handle()` and `handle()` methods
 3. Register in TUI's `run()` method in the `action_handlers` list
 

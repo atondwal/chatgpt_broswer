@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Optional, Union, Dict, Any
 
-from src.core.logging_config import get_logger
+from chatgpt_browser.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

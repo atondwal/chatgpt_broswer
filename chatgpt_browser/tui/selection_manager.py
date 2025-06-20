@@ -2,7 +2,7 @@
 """Selection management for the TUI interface."""
 
 from typing import Set, Optional, List, Tuple, Any
-from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
+from chatgpt_browser.tui.action_handler import ActionHandler, ActionContext, ActionResult
 
 
 class SelectionManager(ActionHandler):

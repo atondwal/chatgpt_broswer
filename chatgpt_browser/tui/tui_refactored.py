@@ -6,14 +6,14 @@ import curses
 import sys
 from pathlib import Path
 
-from src.core.claude_loader import find_claude_project_for_cwd, list_claude_projects
-from src.core.logging_config import setup_logging, get_logger
-from src.core.curses_context import curses_context, emergency_cleanup
-from src.tui.tui_state import TUIInitializer, ManagerRegistry, UIState, ViewMode, validate_tui_environment
-from src.tui.tui_utils import ActionDispatcher, ViewRenderer, InputHandler, TreeUpdater, create_action_context
-from src.tui.tree_view import TreeView
-from src.tui.search_overlay import SearchOverlay
-from src.tui.action_handler import ActionContext, ActionResult
+from chatgpt_browser.core.claude_loader import find_claude_project_for_cwd, list_claude_projects
+from chatgpt_browser.core.logging_config import setup_logging, get_logger
+from chatgpt_browser.core.curses_context import curses_context, emergency_cleanup
+from chatgpt_browser.tui.tui_state import TUIInitializer, ManagerRegistry, UIState, ViewMode, validate_tui_environment
+from chatgpt_browser.tui.tui_utils import ActionDispatcher, ViewRenderer, InputHandler, TreeUpdater, create_action_context
+from chatgpt_browser.tui.tree_view import TreeView
+from chatgpt_browser.tui.search_overlay import SearchOverlay
+from chatgpt_browser.tui.action_handler import ActionContext, ActionResult
 
 
 class TUI:
@@ -121,7 +121,7 @@ class TUI:
     
     def _handle_search_input(self) -> str:
         """Handle input in search mode."""
-        from src.tui.key_mapper import get_key_with_escape_handling
+        from chatgpt_browser.tui.key_mapper import get_key_with_escape_handling
         
         try:
             key = get_key_with_escape_handling(self.stdscr)
