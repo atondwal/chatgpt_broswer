@@ -184,6 +184,7 @@ class TreeManager(ActionHandler):
             "",
             "Claude Integration:",
             "  r          - Resume Claude session",
+            "  c          - New Claude Code session",
             "",
             "Multi-select:",
             "  Space      - Select/deselect",

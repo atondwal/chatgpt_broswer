@@ -141,6 +141,8 @@ class TreeView:
             return "paste"
         elif key == ord('r'):  # Resume Claude session
             return "resume"
+        elif key == ord('c'):  # New Claude Code session
+            return "new_claude_code"
         # Function keys
         elif key == curses.KEY_F1:  # F1 - Help
             return "help"

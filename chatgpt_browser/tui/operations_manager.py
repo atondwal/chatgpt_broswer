@@ -264,7 +264,7 @@ class OperationsManager(ActionHandler):
     def can_handle(self, action: str) -> bool:
         """Check if this handler can process the action."""
         actions = {"new_folder", "rename", "delete", "move_up", "move_down", 
-                   "indent", "outdent", "move", "bulk_move", "resume"}
+                   "indent", "outdent", "move", "bulk_move", "resume", "new_claude_code"}
         return action in actions
         
     def handle(self, action: str, context: ActionContext) -> Optional[ActionResult]:
@@ -374,6 +374,9 @@ class OperationsManager(ActionHandler):
         elif action == "resume":
             return self._handle_resume(context)
             
+        elif action == "new_claude_code":
+            return self._handle_new_claude_code(context)
+            
         return None
         
     def _handle_bulk_move(self, context: ActionContext) -> ActionResult:
@@ -448,3 +451,18 @@ class OperationsManager(ActionHandler):
         if cwd:
             os.chdir(cwd)
         os.system(f'claude --resume {session_id}')
+            
+    def _handle_new_claude_code(self, context: ActionContext) -> ActionResult:
+        """Handle starting a new Claude Code session."""
+        import subprocess
+        import curses
+        import os
+        
+        # Properly end ncurses mode
+        curses.endwin()
+        
+        # Run the claude command
+        os.system('claude')
+        
+        # Exit the TUI after launching Claude
+        return ActionResult(True, message="Started new Claude Code session", exit_tui=True)
