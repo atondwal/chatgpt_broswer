@@ -107,8 +107,10 @@ class TreeManager(ActionHandler):
             
         elif action == "toggle_sort":
             context.tui.sort_by_date = not context.tui.sort_by_date
+            self.tree.clear_custom_order()
             sort_type = "date" if context.tui.sort_by_date else "alphabetical"
-            return ActionResult(True, message=f"Sorting by {sort_type}", refresh_tree=True)
+            return ActionResult(True, message=f"Sorting by {sort_type} (custom order cleared)", 
+                              save_tree=True, refresh_tree=True)
             
         elif action == "clear_custom_order":
             self.tree.clear_custom_order()

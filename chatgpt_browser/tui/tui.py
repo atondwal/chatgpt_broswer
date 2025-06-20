@@ -142,13 +142,17 @@ class TUI:
             self.stdscr.addstr(height-1, 0, self.status_message[:width-1], curses.color_pair(2))
             self.status_message = ""
         else:
-            # Show help
+            # Show help with project info
             multi_info = f" [{len(self.selection_manager.selected_items)} selected]" if self.selection_manager.selected_items else ""
             visual_info = " [VISUAL]" if self.selection_manager.visual_mode else ""
             search_info = f" [{len(self.search_manager.search_matches)} matches]" if self.search_manager.search_matches else ""
             filter_info = f" [{len(self.filtered_conversations)} filtered]" if len(self.filtered_conversations) != len(self.conversations) else ""
+            
+            # Get project info for Claude projects
+            project_info = self._get_project_info()
+            
             help_text = {
-                ViewMode.TREE: f"/:Search f:Filter Ctrl+F:FZF n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}",
+                ViewMode.TREE: f"/:Search f:Filter Ctrl+F:FZF n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}{project_info}",
                 ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.search_manager.filter_mode else 
                                 "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"), 
             }.get(self.current_view, "q:Quit")
@@ -496,6 +500,20 @@ class TUI:
             # Restore curses mode
             self.stdscr.refresh()
     
+    def _get_project_info(self) -> str:
+        """Get project information for the status line."""
+        # Check if we're in a Claude project
+        claude_project = find_claude_project_for_cwd()
+        if claude_project:
+            from pathlib import Path
+            project_name = Path(claude_project).name
+            # Clean up project name for display
+            if project_name.startswith('-'):
+                clean_project = project_name[1:].replace('-', '/')
+            else:
+                clean_project = project_name.replace('-', '/')
+            return f" [📁{clean_project}]"
+        return ""
     
 
 

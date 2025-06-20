@@ -201,3 +201,30 @@ class TestClaudeLoader:
                 assert isinstance(msg.create_time, (int, float))
         finally:
             Path(test_file).unlink(missing_ok=True)
+    
+    def test_project_metadata_inclusion(self):
+        """Test that project information is included in conversation metadata."""
+        msg_data = {
+            "type": "user",
+            "uuid": "project_msg",
+            "timestamp": "2024-01-15T14:30:00Z",
+            "message": {"content": [{"type": "text", "text": "Test project conversation"}]}
+        }
+        
+        # Create a temporary file that simulates a Claude project structure
+        with tempfile.TemporaryDirectory() as temp_dir:
+            claude_dir = Path(temp_dir) / ".claude"
+            projects_dir = claude_dir / "projects" / "-home-user-myproject"
+            projects_dir.mkdir(parents=True, exist_ok=True)
+            
+            test_file = projects_dir / "conversation.jsonl"
+            with open(test_file, 'w') as f:
+                f.write(json.dumps(msg_data) + '\n')
+            
+            conversations = load_claude_conversations(str(test_file))
+            assert len(conversations) == 1
+            
+            conv = conversations[0]
+            assert conv.metadata is not None
+            assert conv.metadata.get('source') == 'claude'
+            assert conv.metadata.get('project') == '-home-user-myproject'
