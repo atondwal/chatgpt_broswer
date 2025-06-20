@@ -320,14 +320,21 @@ class OperationsManager(ActionHandler):
                 if not context.selected_item:
                     return ActionResult(False, message="No item to move")
                 node, _, _ = context.selected_item
-                if self.tree.move_item_up(node.id):
+                item_id = node.id
+                if self.tree.move_item_up(item_id):
                     context.tui.action_manager.save_last_action("move_up")
                     message = f"Moved '{node.name}' up"
                 else:
                     return ActionResult(False, message="Cannot move up")
                     
             if "Moved" in message:
-                return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+                # Track the item ID to restore selection after refresh
+                if not context.selected_items:
+                    result = ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+                    result.select_item_id = item_id
+                    return result
+                else:
+                    return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
             return ActionResult(False, message=message)
             
         elif action == "move_down":
@@ -337,14 +344,21 @@ class OperationsManager(ActionHandler):
                 if not context.selected_item:
                     return ActionResult(False, message="No item to move")
                 node, _, _ = context.selected_item
-                if self.tree.move_item_down(node.id):
+                item_id = node.id
+                if self.tree.move_item_down(item_id):
                     context.tui.action_manager.save_last_action("move_down")
                     message = f"Moved '{node.name}' down"
                 else:
                     return ActionResult(False, message="Cannot move down")
                     
             if "Moved" in message:
-                return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+                # Track the item ID to restore selection after refresh
+                if not context.selected_items:
+                    result = ActionResult(True, message=message, save_tree=True, refresh_tree=True)
+                    result.select_item_id = item_id
+                    return result
+                else:
+                    return ActionResult(True, message=message, save_tree=True, refresh_tree=True)
             return ActionResult(False, message=message)
             
         elif action == "indent":

@@ -309,10 +309,15 @@ class TUI:
                             self.tree.save()
                         if action_result.refresh_tree:
                             self._refresh_tree()
+                            # Restore selection to the moved item if specified
+                            if action_result.select_item_id:
+                                self._move_cursor_to_item(action_result.select_item_id)
                         if action_result.change_view:
                             self.current_view = action_result.change_view
                         if action_result.clear_selection:
                             self.selection_manager.clear_selection()
+                        if action_result.exit_tui:
+                            self.running = False
                         break
                         
         # Handle special search keys that don't come as results from tree_view

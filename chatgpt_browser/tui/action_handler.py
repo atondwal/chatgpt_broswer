@@ -37,6 +37,8 @@ class ActionResult:
     save_tree: bool = False
     change_view: Optional[Any] = None
     clear_selection: bool = False
+    select_item_id: Optional[str] = None  # ID of item to select after refresh
+    exit_tui: bool = False  # Exit the TUI
         
 
 class ActionHandler(ABC):
