@@ -332,3 +332,7 @@ class ConversationTree:
             
         order[current_idx], order[current_idx + 1] = order[current_idx + 1], order[current_idx]
         return True
+    
+    def clear_custom_order(self) -> None:
+        """Clear all custom ordering, restoring automatic sorting."""
+        self.custom_order.clear()
