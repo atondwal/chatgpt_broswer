@@ -117,6 +117,8 @@ class TUI:
                 # Use enhanced key reading for better function key support
                 from chatgpt_browser.tui.key_mapper import get_key_with_escape_handling
                 key = get_key_with_escape_handling(stdscr)
+                if key is not -1:
+                    self.status_message = ""
                 self._handle_key(key)
             except KeyboardInterrupt:
                 break
@@ -140,7 +142,6 @@ class TUI:
         # Status line
         if self.status_message:
             self.stdscr.addstr(height-1, 0, self.status_message[:width-1], curses.color_pair(2))
-            self.status_message = ""
         else:
             # Show help with project info
             multi_info = f" [{len(self.selection_manager.selected_items)} selected]" if self.selection_manager.selected_items else ""
