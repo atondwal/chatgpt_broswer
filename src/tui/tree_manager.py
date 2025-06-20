@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Tree management operations for the TUI interface."""
 
+import os
+import tempfile
+import subprocess
 from typing import Optional, Any
 from src.tui.action_handler import ActionHandler, ActionContext, ActionResult
+from src.core.exporter import export_conversation
 
 
 class TreeManager(ActionHandler):
@@ -31,9 +35,9 @@ class TreeManager(ActionHandler):
                 self.tree.toggle_folder(node.id)
                 return ActionResult(True, refresh_tree=True)
             elif conv:
-                context.tui.detail_view.set_conversation(conv)
-                from src.tui.tui import ViewMode
-                return ActionResult(True, change_view=ViewMode.DETAIL)
+                # Open conversation in editor
+                self._open_in_editor(conv)
+                return ActionResult(True)
                 
         elif action == "toggle":
             if context.selected_item:
@@ -171,7 +175,7 @@ class TreeManager(ActionHandler):
             "  o/O        - Sort order/Clear custom",
             "",
             "View Control:",
-            "  Enter      - Open/toggle folder",
+            "  Enter      - Open conversation in editor/toggle folder",
             "  E          - Expand all",
             "  C          - Collapse all", 
             "  1-5        - Expand to depth",
@@ -200,3 +204,42 @@ class TreeManager(ActionHandler):
         help_win.refresh()
         help_win.getch()  # Wait for any key
         del help_win
+        
+    def _open_in_editor(self, conversation) -> None:
+        """Open conversation in user's editor."""
+        # Export conversation to temp file
+        content = export_conversation(conversation, format="markdown")
+        
+        # Create temp file with .md extension for syntax highlighting
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+            f.write(content)
+            temp_path = f.name
+        
+        try:
+            # Get editor from environment or use sensible defaults
+            editor = os.environ.get('EDITOR', 'vi')
+            if not editor:
+                # Try common editors
+                for ed in ['nano', 'vim', 'vi', 'emacs', 'less']:
+                    if subprocess.run(['which', ed], capture_output=True).returncode == 0:
+                        editor = ed
+                        break
+                else:
+                    editor = 'less'  # Fallback to less for viewing
+            
+            # Suspend curses temporarily
+            import curses
+            curses.endwin()
+            
+            # Open in editor
+            subprocess.run([editor, temp_path])
+            
+            # Resume curses
+            curses.doupdate()
+            
+        finally:
+            # Clean up temp file
+            try:
+                os.unlink(temp_path)
+            except:
+                pass

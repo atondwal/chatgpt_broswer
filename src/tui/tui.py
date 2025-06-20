@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import List
 
 from src.core.loader import load_conversations
+from src.core.exporter import export_conversation as export_conv
 from src.tree.tree import ConversationTree
-from src.tui.detail import DetailView
 from src.tui.input import get_input, confirm, select_folder
 from src.tui.tree_view import TreeView
 from src.tui.search_overlay import SearchOverlay
@@ -26,7 +26,6 @@ from src.tui.action_handler import ActionContext, ActionResult
 class ViewMode(Enum):
     """Available view modes."""
     TREE = "tree"
-    DETAIL = "detail"
     SEARCH = "search"
 
 
@@ -80,7 +79,6 @@ class TUI:
         curses.init_pair(3, curses.COLOR_YELLOW, -1)                 # Folder
         
         # Initialize components
-        self.detail_view = DetailView(stdscr)
         self.tree_view = TreeView(stdscr)
         height, width = stdscr.getmaxyx()
         self.search_overlay = SearchOverlay(stdscr, 0, 0, width)
@@ -123,11 +121,8 @@ class TUI:
         self.stdscr.clear()
         height, width = self.stdscr.getmaxyx()
         
-        # Draw appropriate view
-        if self.current_view == ViewMode.DETAIL:
-            self.detail_view.draw()
-        else:
-            self._draw_tree()
+        # Draw tree view
+        self._draw_tree()
             
         # Draw search overlay if active
         if self.current_view == ViewMode.SEARCH:
@@ -147,7 +142,6 @@ class TUI:
                 ViewMode.TREE: f"/:Search f:Filter n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}",
                 ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.search_manager.filter_mode else 
                                 "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"), 
-                ViewMode.DETAIL: "↑/↓:Scroll q/ESC:Back",
             }.get(self.current_view, "q:Quit")
             self.stdscr.addstr(height-1, 0, help_text[:width-1])
             
@@ -247,11 +241,6 @@ class TUI:
                             self.status_message = f"No matches found for: {term}"
             return
             
-        if self.current_view == ViewMode.DETAIL:
-            result = self.detail_view.handle_input(key)
-            if result == "close_detail":
-                self.current_view = ViewMode.TREE
-            return
             
         # Common navigation
         if key == ord('q'):

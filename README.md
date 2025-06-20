@@ -125,9 +125,9 @@ python scripts/cgpt.py projects
 - **?**: Show help with all commands
 
 ### Reading Conversations
-- **↑/↓**: Scroll
-- **Page Up/Down**: Page scroll
-- **q**: Back to list
+- **Enter**: Opens conversation in your `$EDITOR` (vim, nano, etc.)
+- The conversation is formatted as Markdown for easy reading
+- Automatically cleans up temp file when you close the editor
 
 ## 🌳 Enhanced Tree View Features
 

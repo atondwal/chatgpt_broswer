@@ -9,6 +9,7 @@ from typing import Optional
 from src.core.loader import load_conversations
 from src.core.claude_loader import list_claude_projects
 from src.core.time_utils import format_relative_time
+from src.core.exporter import export_conversation as export_conv
 
 
 def list_conversations(file_path: str, count: int = 20, format: str = "auto") -> None:
@@ -43,7 +44,7 @@ def list_conversations(file_path: str, count: int = 20, format: str = "auto") ->
         print(f"{marker} {i+1:2}. {modified:<12} {created:<12} {msg_count:>10} {title}")
 
 
-def export_conversation(file_path: str, number: int, format: str = "auto") -> None:
+def export_conversation(file_path: str, number: int, format: str = "auto", export_format: str = "text") -> None:
     """Export a conversation to stdout."""
     conversations = load_conversations(file_path, format=format)
     
@@ -58,14 +59,9 @@ def export_conversation(file_path: str, number: int, format: str = "auto") -> No
         
     conv = conversations[idx]
     
-    # Print conversation
-    print(f"Conversation: {conv.title}")
-    print("=" * 50)
-    
-    for msg in conv.messages:
-        print(f"\n{msg.role.value.upper()}:")
-        print("-" * 50)
-        print(msg.content)
+    # Export using shared exporter
+    output = export_conv(conv, format=export_format)
+    print(output)
 
 
 def search_conversations(file_path: str, query: str, content: bool = False, format: str = "auto") -> None:
@@ -170,6 +166,8 @@ def main():
     # Export command
     export_parser = subparsers.add_parser("export", help="Export a conversation")
     export_parser.add_argument("number", type=int, help="Conversation number")
+    export_parser.add_argument("--export-format", choices=["text", "markdown", "json"], 
+                              default="text", help="Export format (default: text)")
     
     # Search command
     search_parser = subparsers.add_parser("search", help="Search conversations")
@@ -198,7 +196,8 @@ def main():
     if args.command == "list":
         list_conversations(args.conversations_file, args.count, format=args.format)
     elif args.command == "export":
-        export_conversation(args.conversations_file, args.number, format=args.format)
+        export_conversation(args.conversations_file, args.number, format=args.format, 
+                          export_format=args.export_format)
     elif args.command == "search":
         search_conversations(args.conversations_file, args.query, args.content, format=args.format)
     else:
