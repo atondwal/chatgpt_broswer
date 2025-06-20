@@ -507,12 +507,7 @@ class TUI:
         if claude_project:
             from pathlib import Path
             project_name = Path(claude_project).name
-            # Clean up project name for display
-            if project_name.startswith('-'):
-                clean_project = project_name[1:].replace('-', '/')
-            else:
-                clean_project = project_name.replace('-', '/')
-            return f" [📁{clean_project}]"
+            return f" [📁{project_name}]"
         return ""
     
 
