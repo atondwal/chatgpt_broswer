@@ -30,11 +30,7 @@ def validate_file_path(file_path: str, must_exist: bool = True) -> Optional[Path
             return None
             
         # Check if it's a valid path (not a directory when expecting file)
-        if must_exist and path.exists() and path.is_dir():
-            # For Claude projects, directories are valid
-            if not any(path.glob("*.jsonl")):
-                logger.warning(f"Directory exists but contains no .jsonl files: {path}")
-                return None
+        
         
         return path
         

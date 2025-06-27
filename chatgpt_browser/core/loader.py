@@ -6,6 +6,7 @@ import os
 from typing import List, Dict, Any
 from chatgpt_browser.core.models import Conversation, Message, MessageRole
 from chatgpt_browser.core.claude_loader import load_claude_conversations, load_claude_conversation
+from chatgpt_browser.core.gemini_loader import load_gemini_conversations, load_gemini_conversation
 from chatgpt_browser.core.lazy_loader import LazyConversationLoader, ConversationMetadata
 from chatgpt_browser.core.performance import get_performance_monitor, enable_performance_monitoring, ProgressIndicator
 from chatgpt_browser.core.logging_config import get_logger
@@ -21,8 +22,11 @@ def load_conversations(file_path: str, format: str = "auto", use_lazy_loading: b
         # Auto-detect format
         if format == "auto":
             if os.path.isdir(file_path):
-                # Directory implies Claude project
-                format = "claude"
+                # Directory implies Claude or Gemini project
+                if ".gemini" in file_path:
+                    format = "gemini"
+                else:
+                    format = "claude"
             elif file_path.endswith('.jsonl'):
                 format = "claude"
             else:
@@ -35,6 +39,8 @@ def load_conversations(file_path: str, format: str = "auto", use_lazy_loading: b
         # Route to appropriate loader
         if format == "claude":
             return load_claude_conversations(file_path)
+        elif format == "gemini":
+            return load_gemini_conversations(file_path)
         else:
             return load_chatgpt_conversations(file_path)
 
@@ -199,6 +205,7 @@ def _load_conversations_lazy(file_path: str, format: str) -> List[Conversation]:
     # Register loaders
     lazy_loader.register_loader("chatgpt", _load_single_chatgpt_conversation)
     lazy_loader.register_loader("claude", load_claude_conversation)
+    lazy_loader.register_loader("gemini", load_gemini_conversation)
     
     # Scan for metadata
     metadata_list = lazy_loader.scan_conversations(file_path, format)

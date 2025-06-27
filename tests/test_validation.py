@@ -46,12 +46,6 @@ class TestFilePathValidation:
             assert result is not None
             assert result.is_dir()
     
-    def test_validate_directory_without_jsonl(self):
-        """Test validation fails for directory without JSONL files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = validate_file_path(tmpdir, must_exist=True)
-            assert result is None
-    
     def test_validate_invalid_path(self):
         """Test validation fails for invalid path."""
         # Test with null bytes (invalid in paths)

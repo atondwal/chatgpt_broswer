@@ -152,7 +152,7 @@ def main():
     # Format option
     parser.add_argument(
         "--format",
-        choices=["auto", "chatgpt", "claude"],
+        choices=["auto", "chatgpt", "claude", "gemini"],
         default="auto",
         help="Conversation format (auto-detected by default)"
     )
@@ -161,6 +161,13 @@ def main():
     parser.add_argument(
         "--claude-project",
         help="Browse a specific Claude project by name"
+    )
+
+    # Gemini session option
+    parser.add_argument(
+        "--gemini",
+        action="store_true",
+        help="Browse Gemini sessions from ~/.gemini/tmp"
     )
     
     # Commands
@@ -195,6 +202,11 @@ def main():
     if args.claude_project:
         args.conversations_file = str(Path.home() / ".claude" / "projects" / args.claude_project)
         args.format = "claude"
+
+    # Handle Gemini session shortcut
+    if args.gemini:
+        args.conversations_file = str(Path.home() / ".gemini" / "tmp")
+        args.format = "gemini"
     
     # Handle projects command
     if args.command == "projects":

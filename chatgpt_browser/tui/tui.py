@@ -523,7 +523,7 @@ def main():
     parser = argparse.ArgumentParser(description="ChatGPT History Browser")
     parser.add_argument("conversations_file", nargs="?", help="Path to conversations file or Claude project")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument("--format", choices=["auto", "chatgpt", "claude"], default="auto",
+    parser.add_argument("--format", choices=["auto", "chatgpt", "claude", "gemini"], default="auto",
                        help="Conversation format (auto-detected by default)")
     
     args = parser.parse_args()
@@ -532,13 +532,16 @@ def main():
     setup_logging(debug_mode=args.debug)
     logger = get_logger(__name__)
     
-    # Auto-detect Claude project if no file specified
+    # Auto-detect Claude or Gemini project if no file specified
     if not args.conversations_file:
         # Check if we're in a Claude project directory
         claude_project = find_claude_project_for_cwd()
         if claude_project:
             args.conversations_file = claude_project
             args.format = "claude"
+        elif (Path.home() / ".gemini" / "tmp").exists():
+            args.conversations_file = str(Path.home() / ".gemini" / "tmp")
+            args.format = "gemini"
         else:
             # Fall back to showing Claude project picker
             projects = list_claude_projects()
