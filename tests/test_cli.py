@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import argparse
 
-from chatgpt_browser.cli.cli import main, list_conversations, export_conversation, search_conversations
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from ccsm.cli.cli import main, list_conversations, export_conversation, search_conversations
+from ccsm.core.models import Conversation, Message, MessageRole
 
 
 class TestCLI:
@@ -101,28 +101,28 @@ class TestCLI:
     def test_main_list_command(self):
         """Test main function with list command."""
         with patch('sys.argv', ['cli', self.test_file, 'list']):
-            with patch('chatgpt_browser.cli.cli.list_conversations') as mock_list:
+            with patch('ccsm.cli.cli.list_conversations') as mock_list:
                 main()
                 mock_list.assert_called_once_with(self.test_file, 20, format='auto')
     
     def test_main_export_command(self):
         """Test main function with export command."""
         with patch('sys.argv', ['cli', self.test_file, 'export', '1']):
-            with patch('chatgpt_browser.cli.cli.export_conversation') as mock_export:
+            with patch('ccsm.cli.cli.export_conversation') as mock_export:
                 main()
                 mock_export.assert_called_once_with(self.test_file, 1, format='auto', export_format='text')
     
     def test_main_search_command(self):
         """Test main function with search command."""
         with patch('sys.argv', ['cli', self.test_file, 'search', 'python']):
-            with patch('chatgpt_browser.cli.cli.search_conversations') as mock_search:
+            with patch('ccsm.cli.cli.search_conversations') as mock_search:
                 main()
                 mock_search.assert_called_once_with(self.test_file, 'python', False, format='auto')
     
     def test_main_no_command(self):
         """Test main function with no command defaults to list."""
         with patch('sys.argv', ['cli', self.test_file]):
-            with patch('chatgpt_browser.cli.cli.list_conversations') as mock_list:
+            with patch('ccsm.cli.cli.list_conversations') as mock_list:
                 try:
                     main()
                 except SystemExit:
@@ -181,8 +181,8 @@ class TestCLIClaudeProjectDetection:
     def test_main_no_args_with_claude_project(self):
         """Test main function with no arguments auto-detects Claude project."""
         with patch('sys.argv', ['cli']):
-            with patch('chatgpt_browser.cli.cli.find_claude_project_for_cwd') as mock_find:
-                with patch('chatgpt_browser.cli.cli.list_conversations') as mock_list:
+            with patch('ccsm.cli.cli.find_claude_project_for_cwd') as mock_find:
+                with patch('ccsm.cli.cli.list_conversations') as mock_list:
                     with patch('pathlib.Path.exists', return_value=True):
                         mock_find.return_value = '/fake/project/path'
                         main()
@@ -191,9 +191,9 @@ class TestCLIClaudeProjectDetection:
     def test_main_no_args_no_claude_project(self):
         """Test main function with no arguments falls back to project picker."""
         with patch('sys.argv', ['cli']):
-            with patch('chatgpt_browser.cli.cli.find_claude_project_for_cwd') as mock_find:
-                with patch('chatgpt_browser.cli.cli.list_claude_projects') as mock_list_projects:
-                    with patch('chatgpt_browser.cli.cli.list_claude_projects_cmd') as mock_projects_cmd:
+            with patch('ccsm.cli.cli.find_claude_project_for_cwd') as mock_find:
+                with patch('ccsm.cli.cli.list_claude_projects') as mock_list_projects:
+                    with patch('ccsm.cli.cli.list_claude_projects_cmd') as mock_projects_cmd:
                         with patch('builtins.input', return_value='1'):
                             with patch('pathlib.Path.exists', return_value=True):
                                 mock_find.return_value = None
@@ -206,8 +206,8 @@ class TestCLIClaudeProjectDetection:
     def test_main_no_args_with_claude_project_list_command(self):
         """Test main function with list command auto-detects Claude project."""
         with patch('sys.argv', ['cli', 'list']):
-            with patch('chatgpt_browser.cli.cli.find_claude_project_for_cwd') as mock_find:
-                with patch('chatgpt_browser.cli.cli.list_conversations') as mock_list:
+            with patch('ccsm.cli.cli.find_claude_project_for_cwd') as mock_find:
+                with patch('ccsm.cli.cli.list_conversations') as mock_list:
                     with patch('pathlib.Path.exists', return_value=True):
                         mock_find.return_value = '/fake/project/path'
                         main()
@@ -221,8 +221,8 @@ class TestCLIClaudeProjectDetection:
         
         try:
             with patch('sys.argv', ['cli', test_file, 'list']):
-                with patch('chatgpt_browser.cli.cli.find_claude_project_for_cwd') as mock_find:
-                    with patch('chatgpt_browser.cli.cli.list_conversations') as mock_list:
+                with patch('ccsm.cli.cli.find_claude_project_for_cwd') as mock_find:
+                    with patch('ccsm.cli.cli.list_conversations') as mock_list:
                         mock_find.return_value = '/fake/project/path'
                         main()
                         # Should use the explicit file, not the detected project

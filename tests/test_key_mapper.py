@@ -3,7 +3,7 @@
 
 import curses
 from unittest.mock import Mock
-from chatgpt_browser.tui.key_mapper import get_key_with_escape_handling
+from ccsm.tui.key_mapper import get_key_with_escape_handling
 
 def test_escape_sequences():
     """Test that escape sequences are properly mapped to function keys."""

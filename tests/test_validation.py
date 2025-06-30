@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from chatgpt_browser.core.validation import (
+from ccsm.core.validation import (
     validate_file_path, validate_json_data, validate_conversation_number,
     validate_project_selection, sanitize_search_term, validate_export_format,
     validate_count_parameter

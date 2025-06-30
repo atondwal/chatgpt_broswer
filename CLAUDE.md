@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ChatGPT Browser is a simple, fast terminal-based tool for browsing and organizing ChatGPT and Claude conversation history. The codebase emphasizes simplicity and self-documenting code.
+CCSM (Claude Code Session Manager) is a simple, fast terminal-based tool for browsing and organizing Claude Code and ChatGPT conversation history. The codebase emphasizes simplicity and self-documenting code.
 
 ## Development Commands
 
@@ -31,10 +31,10 @@ pytest -m tui        # TUI-specific tests
 ### Code Formatting
 ```bash
 # Format code with Black (line-length: 120)
-black chatgpt_browser/ tests/
+black ccsm/ tests/
 
 # Sort imports
-isort chatgpt_browser/ tests/
+isort ccsm/ tests/
 ```
 
 ### Installation for Development
@@ -43,8 +43,8 @@ isort chatgpt_browser/ tests/
 pipx install --editable .
 
 # Entry points available after installation
-cgpt      # CLI interface
-cgpt-tui  # Terminal UI interface
+ccsm      # CLI interface
+ccsm-tui  # Terminal UI interface
 ```
 
 ## Key Design Principles
@@ -60,8 +60,8 @@ The codebase was significantly simplified from 7,900 lines to ~1,500 lines while
 
 ### Project Structure
 ```
-chatgpt_browser/
-├── chatgpt_browser/     # Main package
+ccsm/
+├── ccsm/                # Main package
 │   ├── core/            # Data models and loading
 │   ├── tree/            # Tree organization logic
 │   ├── tui/             # Terminal UI components
@@ -93,8 +93,8 @@ The TUI uses a modular action-based architecture:
 
 ### Data Format Support
 
-1. **ChatGPT Format**: JSON export from ChatGPT
-2. **Claude Format**: JSONL files in `~/.claude/projects/<PROJECT_NAME>/`
+1. **Claude Format**: JSONL files in `~/.claude/projects/<PROJECT_NAME>/`
+2. **ChatGPT Format**: JSON export from ChatGPT
 3. **Auto-detection**: Format detected by file extension or directory structure
 4. **Unified Model**: Both formats use same `Conversation` and `Message` models
 
@@ -107,7 +107,7 @@ The TUI uses a modular action-based architecture:
 4. Update help text in `TreeManager.show_help()`
 
 ### Adding a New Manager
-1. Create new file in `chatgpt_browser/tui/` inheriting from `ActionHandler`
+1. Create new file in `ccsm/tui/` inheriting from `ActionHandler`
 2. Implement `can_handle()` and `handle()` methods
 3. Register in TUI's `run()` method in the `action_handlers` list
 

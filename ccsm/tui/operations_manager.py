@@ -2,8 +2,8 @@
 """Operations management for folder and item operations."""
 
 from typing import Set, List, Tuple, Any, Optional
-from chatgpt_browser.tui.input import get_input, confirm, select_folder
-from chatgpt_browser.tui.action_handler import ActionHandler, ActionContext, ActionResult
+from ccsm.tui.input import get_input, confirm, select_folder
+from ccsm.tui.action_handler import ActionHandler, ActionContext, ActionResult
 
 
 class OperationsManager(ActionHandler):
@@ -102,7 +102,7 @@ class OperationsManager(ActionHandler):
         if not current_item:
             return "No item selected to move"
             
-        from chatgpt_browser.tui.input import select_folder
+        from ccsm.tui.input import select_folder
         
         node, _, _ = current_item
         target_folder = select_folder(self.stdscr, self.tree, f"Move '{node.name}' to:")

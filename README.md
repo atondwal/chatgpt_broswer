@@ -1,6 +1,6 @@
-# ChatGPT History Browser
+# CCSM (Claude Code Session Manager)
 
-A simple, fast tool for browsing and organizing your ChatGPT and Claude conversation history with excellent UX.
+A simple, fast tool for browsing and organizing your Claude Code and ChatGPT conversation history with excellent UX.
 
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -32,15 +32,15 @@ Claude Code automatically saves your conversations locally in `~/.claude/project
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/chatgpt_browser.git
-cd chatgpt_browser
+git clone https://github.com/your-username/ccsm.git
+cd ccsm
 
 # Option 1: Use directly with Python (no installation needed)
-python scripts/cgpt-tui.py conversations.json
+python scripts/ccsm-tui.py conversations.json
 
 # Option 2: Install for convenient access from anywhere
 pip install -e .
-cgpt-tui conversations.json
+ccsm-tui conversations.json
 ```
 
 ### Running the TUI
@@ -48,43 +48,43 @@ cgpt-tui conversations.json
 #### For ChatGPT History
 ```bash
 # Direct execution (no installation needed)
-python scripts/cgpt-tui.py conversations.json
+python scripts/ccsm-tui.py conversations.json
 
 # After installation
-cgpt-tui conversations.json
+ccsm-tui conversations.json
 ```
 
 #### For Claude Code History
 ```bash
 # List available Claude projects
-python scripts/cgpt.py projects
+python scripts/ccsm.py projects
 
 # Browse a specific Claude project
-python scripts/cgpt-tui.py ~/.claude/projects/<PROJECT_NAME>
+python scripts/ccsm-tui.py ~/.claude/projects/<PROJECT_NAME>
 
 # Or use the shortcut
-python scripts/cgpt-tui.py --claude-project <PROJECT_NAME>
+python scripts/ccsm-tui.py --claude-project <PROJECT_NAME>
 ```
 
 ### Running the CLI
 
 ```bash
 # List conversations (matches claude --resume format)
-python scripts/cgpt.py conversations.json list
+python scripts/ccsm.py conversations.json list
 # Output:
 #      Modified     Created      # Messages  Summary
 # ❯  1. 10h ago     1 day ago          133 This session is being continued from...
 #    2. 1 day ago   1 day ago          607 Refactoring TUI: Breaking Down...
-#    3. 2 days ago  2 days ago          281 ChatGPT Browser: Tree Org, TUI...
+#    3. 2 days ago  2 days ago          281 CCSM: Tree Org, TUI...
 
 # Search conversations
-python scripts/cgpt.py conversations.json search "python"
+python scripts/ccsm.py conversations.json search "python"
 
 # Export a specific conversation
-python scripts/cgpt.py conversations.json export 1
+python scripts/ccsm.py conversations.json export 1
 
 # List Claude projects
-python scripts/cgpt.py projects
+python scripts/ccsm.py projects
 # Output:
 #      Last Modified   # Convos   Project Name
 # ❯  1. Just now              20  home/atondwal/playground
@@ -151,10 +151,10 @@ This codebase demonstrates **self-documenting code** principles. The code is sim
 ### Project Structure
 
 ```
-chatgpt_browser/
+ccsm/
 ├── scripts/              # Entry point scripts
-│   ├── cgpt.py          # CLI entry point
-│   └── cgpt-tui.py      # TUI entry point
+│   ├── ccsm.py          # CLI entry point
+│   └── ccsm-tui.py      # TUI entry point
 ├── src/                 # Source code
 │   ├── core/            # Core data models and loading
 │   ├── tree/            # Tree organization logic
@@ -261,4 +261,4 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**A simple tool that does one thing well: browse ChatGPT conversations.**
+**A simple tool that does one thing well: browse Claude Code and ChatGPT conversations.**

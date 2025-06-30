@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from chatgpt_browser.core.logging_config import setup_logging, get_logger
+from ccsm.core.logging_config import setup_logging, get_logger
 
 
 class TestLoggingConfig:
@@ -16,7 +16,7 @@ class TestLoggingConfig:
     def test_setup_logging_default(self):
         """Test default logging setup."""
         logger = setup_logging()
-        assert logger.name == "chatgpt_browser"
+        assert logger.name == "ccsm"
         assert logger.level == logging.INFO
         assert len(logger.handlers) == 1  # Console handler
     
@@ -63,10 +63,10 @@ class TestLoggingConfig:
         
         # Get module logger
         module_logger = get_logger("test_module")
-        assert module_logger.name == "chatgpt_browser.test_module"
+        assert module_logger.name == "ccsm.test_module"
         
         # Should inherit from root logger
-        assert module_logger.parent.name == "chatgpt_browser"
+        assert module_logger.parent.name == "ccsm"
     
     def test_logging_hierarchy(self):
         """Test that logger hierarchy works correctly."""
@@ -127,10 +127,10 @@ class TestLoggingIntegration:
             setup_logging(level="DEBUG", log_file=str(log_file))
             
             # Import after setting up logging
-            from chatgpt_browser.core.claude_loader import logger as claude_logger
+            from ccsm.core.claude_loader import logger as claude_logger
             
             # Test that the logger is properly configured
-            assert claude_logger.name == "chatgpt_browser.chatgpt_browser.core.claude_loader"
+            assert claude_logger.name == "ccsm.ccsm.core.claude_loader"
             assert claude_logger.getEffectiveLevel() == logging.DEBUG
     
     def test_tree_logging(self):
@@ -140,7 +140,7 @@ class TestLoggingIntegration:
             setup_logging(level="DEBUG", log_file=str(log_file))
             
             # Test that debug messages are logged when tree loading fails
-            from chatgpt_browser.tree.tree import ConversationTree
+            from ccsm.tree.tree import ConversationTree
             
             # Create tree with non-existent file - should trigger debug log
             tree = ConversationTree("/nonexistent/path")

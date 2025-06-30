@@ -2,7 +2,7 @@
 """Tests for core models."""
 
 import pytest
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from ccsm.core.models import Conversation, Message, MessageRole
 
 
 class TestMessageRole:

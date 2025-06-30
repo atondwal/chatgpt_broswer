@@ -4,12 +4,12 @@
 import json
 import os
 from typing import List, Dict, Any
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
-from chatgpt_browser.core.claude_loader import load_claude_conversations, load_claude_conversation
-from chatgpt_browser.core.gemini_loader import load_gemini_conversations, load_gemini_conversation
-from chatgpt_browser.core.lazy_loader import LazyConversationLoader, ConversationMetadata
-from chatgpt_browser.core.performance import get_performance_monitor, enable_performance_monitoring, ProgressIndicator
-from chatgpt_browser.core.logging_config import get_logger
+from ccsm.core.models import Conversation, Message, MessageRole
+from ccsm.core.claude_loader import load_claude_conversations, load_claude_conversation
+from ccsm.core.gemini_loader import load_gemini_conversations, load_gemini_conversation
+from ccsm.core.lazy_loader import LazyConversationLoader, ConversationMetadata
+from ccsm.core.performance import get_performance_monitor, enable_performance_monitoring, ProgressIndicator
+from ccsm.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

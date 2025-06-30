@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import uuid
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
-from chatgpt_browser.core.logging_config import get_logger
+from ccsm.core.models import Conversation, Message, MessageRole
+from ccsm.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

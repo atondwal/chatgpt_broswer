@@ -7,12 +7,12 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
-from chatgpt_browser.core.lazy_loader import (
+from ccsm.core.lazy_loader import (
     ConversationMetadata, 
     ConversationCache, 
     LazyConversationLoader
 )
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from ccsm.core.models import Conversation, Message, MessageRole
 
 
 class TestConversationMetadata:

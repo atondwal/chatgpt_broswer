@@ -25,8 +25,8 @@ class ConversationListView(NavigableListView):
 ### After: Direct Implementation
 ```python
 # 1,367 lines across 10 files
-class ChatGPTTUI:
-    """Terminal interface for browsing ChatGPT conversations."""
+class CCSMTUI:
+    """Terminal interface for browsing Claude Code and ChatGPT conversations."""
     
     def _draw_list(self) -> None:
         """Draw conversation list."""

@@ -4,18 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["chatgpt_browser*"]
+include = ["ccsm*"]
 exclude = ["tests*", "docs*", "data*"]
 
 [project]
-name = "chatgpt-browser"
+name = "ccsm"
 version = "0.1.0"
-description = "A terminal-based browser for ChatGPT conversations with tree organization"
+description = "Claude Code Session Manager - A terminal-based browser for Claude and ChatGPT conversations"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "ChatGPT Browser Contributors"},
+    {name = "CCSM Contributors"},
 ]
 dependencies = [
     "typing-extensions",
@@ -23,8 +23,8 @@ dependencies = [
 ]
 
 [project.scripts]
-cgpt = "chatgpt_browser.cli.cli:main"
-cgpt-tui = "chatgpt_browser.tui.tui:main"
+ccsm = "ccsm.cli.cli:main"
+ccsm-tui = "ccsm.tui.tui:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

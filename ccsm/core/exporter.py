@@ -6,7 +6,7 @@ import io
 import hashlib
 from typing import Optional, Dict, Tuple
 from datetime import datetime
-from chatgpt_browser.core.models import Conversation, MessageRole
+from ccsm.core.models import Conversation, MessageRole
 
 # Simple in-memory cache for exported conversations
 _export_cache: Dict[str, Tuple[str, float]] = {}

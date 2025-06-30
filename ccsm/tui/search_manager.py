@@ -2,7 +2,7 @@
 """Search and filter management for the TUI interface."""
 
 from typing import List, Tuple, Any, Optional
-from chatgpt_browser.tui.action_handler import ActionHandler, ActionContext, ActionResult
+from ccsm.tui.action_handler import ActionHandler, ActionContext, ActionResult
 
 
 class SearchManager(ActionHandler):

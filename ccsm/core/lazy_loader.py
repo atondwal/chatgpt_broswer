@@ -8,9 +8,9 @@ from typing import List, Dict, Optional, Iterator, Any, Callable
 from dataclasses import dataclass, field
 from threading import Lock
 
-from chatgpt_browser.core.models import Conversation, Message
-from chatgpt_browser.core.logging_config import get_logger
-from chatgpt_browser.core.type_definitions import ConversationDict, Timestamp
+from ccsm.core.models import Conversation, Message
+from ccsm.core.logging_config import get_logger
+from ccsm.core.type_definitions import ConversationDict, Timestamp
 
 logger = get_logger(__name__)
 
@@ -307,7 +307,7 @@ class LazyConversationLoader:
                             try:
                                 data = json.loads(line)
                                 if 'timestamp' in data:
-                                    from chatgpt_browser.core.claude_loader import parse_timestamp
+                                    from ccsm.core.claude_loader import parse_timestamp
                                     ts = parse_timestamp(data['timestamp'])
                                     if ts:
                                         if first_timestamp is None:

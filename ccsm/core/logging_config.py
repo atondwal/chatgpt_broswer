@@ -33,7 +33,7 @@ def setup_logging(
         format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     # Configure root logger
-    logger = logging.getLogger("chatgpt_browser")
+    logger = logging.getLogger("ccsm")
     logger.setLevel(getattr(logging, level.upper()))
     
     # Clear any existing handlers
@@ -62,4 +62,4 @@ def setup_logging(
 
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance for the specified module."""
-    return logging.getLogger(f"chatgpt_browser.{name}")
+    return logging.getLogger(f"ccsm.{name}")

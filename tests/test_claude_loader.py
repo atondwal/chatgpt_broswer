@@ -6,7 +6,7 @@ import json
 import pytest
 from pathlib import Path
 
-from chatgpt_browser.core.claude_loader import load_claude_conversations, parse_claude_message
+from ccsm.core.claude_loader import load_claude_conversations, parse_claude_message
 
 
 class TestClaudeLoader:

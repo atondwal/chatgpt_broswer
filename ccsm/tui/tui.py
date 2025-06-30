@@ -9,22 +9,22 @@ from enum import Enum
 from pathlib import Path
 from typing import List
 
-from chatgpt_browser.core.loader import load_conversations
-from chatgpt_browser.core.claude_loader import find_claude_project_for_cwd, list_claude_projects
-from chatgpt_browser.core.exporter import export_conversation as export_conv
-from chatgpt_browser.core.logging_config import setup_logging, get_logger
-from chatgpt_browser.core.curses_context import curses_context, emergency_cleanup
-from chatgpt_browser.tree.tree import ConversationTree
-from chatgpt_browser.tui.input import get_input, confirm, select_folder
-from chatgpt_browser.tui.tree_view import TreeView
-from chatgpt_browser.tui.search_overlay import SearchOverlay
-from chatgpt_browser.tui.selection_manager import SelectionManager
-from chatgpt_browser.tui.search_manager import SearchManager
-from chatgpt_browser.tui.operations_manager import OperationsManager
-from chatgpt_browser.tui.action_manager import ActionManager
-from chatgpt_browser.tui.tree_manager import TreeManager
-from chatgpt_browser.tui.fzf_search import FZFSearch
-from chatgpt_browser.tui.action_handler import ActionContext, ActionResult
+from ccsm.core.loader import load_conversations
+from ccsm.core.claude_loader import find_claude_project_for_cwd, list_claude_projects
+from ccsm.core.exporter import export_conversation as export_conv
+from ccsm.core.logging_config import setup_logging, get_logger
+from ccsm.core.curses_context import curses_context, emergency_cleanup
+from ccsm.tree.tree import ConversationTree
+from ccsm.tui.input import get_input, confirm, select_folder
+from ccsm.tui.tree_view import TreeView
+from ccsm.tui.search_overlay import SearchOverlay
+from ccsm.tui.selection_manager import SelectionManager
+from ccsm.tui.search_manager import SearchManager
+from ccsm.tui.operations_manager import OperationsManager
+from ccsm.tui.action_manager import ActionManager
+from ccsm.tui.tree_manager import TreeManager
+from ccsm.tui.fzf_search import FZFSearch
+from ccsm.tui.action_handler import ActionContext, ActionResult
 
 
 class ViewMode(Enum):
@@ -115,9 +115,9 @@ class TUI:
             try:
                 self._draw()
                 # Use enhanced key reading for better function key support
-                from chatgpt_browser.tui.key_mapper import get_key_with_escape_handling
+                from ccsm.tui.key_mapper import get_key_with_escape_handling
                 key = get_key_with_escape_handling(stdscr)
-                if key is not -1:
+                if key != -1:
                     self.status_message = ""
                 self._handle_key(key)
             except KeyboardInterrupt:

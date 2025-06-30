@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 from contextlib import contextmanager
 
-from chatgpt_browser.core.logging_config import get_logger
+from ccsm.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 

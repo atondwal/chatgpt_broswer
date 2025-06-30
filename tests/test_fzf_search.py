@@ -8,9 +8,9 @@ import os
 from unittest.mock import Mock, patch, MagicMock, call
 from datetime import datetime
 
-from chatgpt_browser.tui.fzf_search import FZFSearch
-from chatgpt_browser.tree.tree import TreeNode
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from ccsm.tui.fzf_search import FZFSearch
+from ccsm.tree.tree import TreeNode
+from ccsm.core.models import Conversation, Message, MessageRole
 
 
 class TestFZFSearch:
@@ -126,7 +126,7 @@ class TestFZFSearch:
         )
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_conversations(self.tree_items)
             
         # Should return index 1 (first conversation in tree_items)
@@ -155,7 +155,7 @@ class TestFZFSearch:
         mock_run.return_value = Mock(returncode=1, stdout="")
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_conversations(self.tree_items)
             
         assert result is None
@@ -172,7 +172,7 @@ class TestFZFSearch:
         mock_run.side_effect = subprocess.TimeoutExpired('fzf', 300)
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_conversations(self.tree_items)
             
         assert result is None
@@ -189,7 +189,7 @@ class TestFZFSearch:
         mock_run.return_value = Mock(returncode=0, stdout="   \n")
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_conversations(self.tree_items)
             
         assert result is None
@@ -221,7 +221,7 @@ class TestFZFSearch:
         )
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_all_items(self.tree_items)
             
         # Should return index 0 (first item - Programming folder)
@@ -247,7 +247,7 @@ class TestFZFSearch:
         )
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_all_items(self.tree_items)
                 
         # Check that FZF was called and something was returned (simplified test)
@@ -274,7 +274,7 @@ class TestFZFSearch:
         mock_run.side_effect = KeyboardInterrupt()
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 result = self.fzf_search.search_all_items(self.tree_items)
             
         assert result is None
@@ -288,7 +288,7 @@ class TestFZFSearch:
         mock_tempfile.return_value.__enter__.return_value = mock_file
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+            with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                 with patch('subprocess.run', side_effect=Exception("Test error")):
                     result = self.fzf_search.search_all_items(self.tree_items)
                 
@@ -331,7 +331,7 @@ class TestFZFSearch:
         mock_tempfile.return_value.__enter__.return_value = mock_file
         
         with patch.object(self.fzf_search, 'fzf_available', True):
-            with patch('chatgpt_browser.core.time_utils.format_relative_time') as mock_format_time:
+            with patch('ccsm.core.time_utils.format_relative_time') as mock_format_time:
                 mock_format_time.side_effect = ["2 hours ago", "3 hours ago", "1 day ago", "2 days ago"]
                 
                 # Just test that the method runs without error
@@ -398,7 +398,7 @@ class TestFZFSearch:
                     mock_tempfile.return_value.__enter__.return_value = mock_file
                     mock_run.return_value = Mock(returncode=1, stdout="")
                     
-                    with patch('chatgpt_browser.core.time_utils.format_relative_time', return_value="1 day ago"):
+                    with patch('ccsm.core.time_utils.format_relative_time', return_value="1 day ago"):
                         self.fzf_search.search_conversations(self.tree_items)
                     
                     # Check that write was called with only conversation lines

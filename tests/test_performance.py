@@ -6,7 +6,7 @@ import tempfile
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
-from chatgpt_browser.core.performance import (
+from ccsm.core.performance import (
     PerformanceMetric,
     PerformanceMonitor,
     enable_performance_monitoring,
@@ -151,7 +151,7 @@ class TestPerformanceMonitor:
         duration = self.monitor.end_metric("nonexistent")
         assert duration is None
     
-    @patch('chatgpt_browser.core.performance.psutil.Process')
+    @patch('ccsm.core.performance.psutil.Process')
     def test_memory_tracking(self, mock_process):
         """Test memory usage tracking."""
         # Mock memory info
@@ -321,7 +321,7 @@ class TestGlobalPerformanceMonitor:
         assert monitor.metrics[0].name == "context_test"
         assert monitor.metrics[0].duration > 0
     
-    @patch('chatgpt_browser.core.performance.psutil.Process')
+    @patch('ccsm.core.performance.psutil.Process')
     def test_memory_monitor_context_manager(self, mock_process):
         """Test memory monitor context manager."""
         enable_performance_monitoring(True)
@@ -331,7 +331,7 @@ class TestGlobalPerformanceMonitor:
         mock_process.return_value.memory_info.return_value = mock_memory_info
         mock_memory_info.rss = 100 * 1024 * 1024  # 100MB
         
-        with patch('chatgpt_browser.core.performance.logger') as mock_logger:
+        with patch('ccsm.core.performance.logger') as mock_logger:
             with memory_monitor("memory_test"):
                 # Simulate memory increase
                 mock_memory_info.rss = 102 * 1024 * 1024  # 102MB
@@ -355,7 +355,7 @@ class TestGlobalPerformanceMonitor:
         """Test profile memory usage decorator."""
         enable_performance_monitoring(True)
         
-        with patch('chatgpt_browser.core.performance.logger') as mock_logger:
+        with patch('ccsm.core.performance.logger') as mock_logger:
             @profile_memory_usage
             def memory_function():
                 return "result"
@@ -509,17 +509,17 @@ class TestPerformanceIntegration:
         assert monitor.metrics[0].name == "exception_test"
         assert monitor.metrics[0].duration > 0
     
-    @patch('chatgpt_browser.core.performance.psutil.Process')
+    @patch('ccsm.core.performance.psutil.Process')
     def test_system_stats_collection(self, mock_process):
         """Test system statistics collection."""
         # Mock psutil data
         mock_process.return_value.memory_info.return_value.rss = 100 * 1024 * 1024
         
-        with patch('chatgpt_browser.core.performance.psutil.cpu_percent', return_value=25.5):
-            with patch('chatgpt_browser.core.performance.psutil.virtual_memory') as mock_vmem:
+        with patch('ccsm.core.performance.psutil.cpu_percent', return_value=25.5):
+            with patch('ccsm.core.performance.psutil.virtual_memory') as mock_vmem:
                 mock_vmem.return_value.percent = 60.0
                 
-                with patch('chatgpt_browser.core.performance.psutil.disk_usage') as mock_disk:
+                with patch('ccsm.core.performance.psutil.disk_usage') as mock_disk:
                     mock_disk.return_value.percent = 80.0
                     
                     monitor = PerformanceMonitor()

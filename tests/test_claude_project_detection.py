@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from chatgpt_browser.core.claude_loader import find_claude_project_for_cwd, encode_path_like_claude
+from ccsm.core.claude_loader import find_claude_project_for_cwd, encode_path_like_claude
 
 
 class TestClaudeProjectDetection:
