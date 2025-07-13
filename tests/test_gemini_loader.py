@@ -7,14 +7,14 @@ import pytest
 from pathlib import Path
 from datetime import datetime, timezone
 
-from chatgpt_browser.core.gemini_loader import (
+from ccsm.core.gemini_loader import (
     load_gemini_conversations,
     load_gemini_conversation,
     parse_gemini_message,
     parse_timestamp,
     generate_title,
 )
-from chatgpt_browser.core.models import Conversation, Message, MessageRole
+from ccsm.core.models import Conversation, Message, MessageRole
 
 class TestGeminiLoader:
     """Test the Gemini loader functionality."""
