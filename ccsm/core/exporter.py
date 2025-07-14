@@ -83,6 +83,9 @@ def export_as_markdown(conversation: Conversation) -> str:
     # Title and metadata
     output.write(f"# {conversation.title}\n\n")
     
+    # Add session ID for resuming Claude sessions
+    output.write(f"**Session ID:** {conversation.id}\n")
+    
     if created_str:
         output.write(f"**Created:** {created_str}\n")
     if updated_str:
@@ -133,8 +136,9 @@ def export_as_text(conversation: Conversation) -> str:
     """Export conversation as plain text using optimized string building."""
     output = io.StringIO()
     
-    # Title
+    # Title and session ID
     output.write(f"Conversation: {conversation.title}\n")
+    output.write(f"Session ID: {conversation.id}\n")
     output.write("=" * 70)
     output.write("\n\n")
     
