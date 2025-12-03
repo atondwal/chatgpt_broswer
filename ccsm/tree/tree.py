@@ -2,11 +2,14 @@
 """Simple, self-documenting conversation tree."""
 
 import json
-import logging
 import uuid
+
+from ccsm.core.logging_config import get_logger
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -75,7 +78,7 @@ class ConversationTree:
             self._clean_invalid_references()
         except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
             # If loading fails, start fresh
-            logging.debug(f"Failed to load tree structure from {self.tree_file}: {e}")
+            logger.debug(f"Failed to load tree structure from {self.org_filename}: {e}")
     
     def _clean_invalid_references(self) -> None:
         """Remove invalid node references."""
