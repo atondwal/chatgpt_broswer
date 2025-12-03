@@ -2,8 +2,12 @@
 """Operations management for folder and item operations."""
 
 from typing import Set, List, Tuple, Any, Optional
+
+from ccsm.core.logging_config import get_logger
 from ccsm.tui.input import get_input, confirm, select_folder
 from ccsm.tui.action_handler import ActionHandler, ActionContext, ActionResult
+
+logger = get_logger(__name__)
 
 
 class OperationsManager(ActionHandler):
@@ -39,9 +43,9 @@ class OperationsManager(ActionHandler):
                     try:
                         self.tree.move_node(item_id, folder_id)
                         moved_items.append(self.tree.nodes[item_id].name)
-                    except Exception:
-                        pass  # Skip items that can't be moved
-                
+                    except Exception as e:
+                        logger.warning(f"Failed to move item {item_id}: {e}")
+
                 if moved_items:
                     status = f"Created '{name}' and moved {len(moved_items)} items into it"
                 else:
@@ -163,9 +167,9 @@ class OperationsManager(ActionHandler):
             try:
                 self.tree.move_node(item_id, target_folder)
                 moved += 1
-            except Exception:
-                pass
-                
+            except Exception as e:
+                logger.warning(f"Failed to indent item {item_id}: {e}")
+
         if moved > 0:
             if moved == 1:
                 return f"Indented item into folder", original_positions
@@ -203,9 +207,9 @@ class OperationsManager(ActionHandler):
                 try:
                     self.tree.move_node(item_id, grandparent_id)
                     moved += 1
-                except Exception:
-                    pass
-                    
+                except Exception as e:
+                    logger.warning(f"Failed to outdent item {item_id}: {e}")
+
         if moved > 0:
             if moved == 1:
                 return f"Outdented item", original_positions
@@ -406,8 +410,8 @@ class OperationsManager(ActionHandler):
                 try:
                     self.tree.move_node(item_id, dest_id)
                     moved += 1
-                except Exception:
-                    pass  # Skip items that can't be moved
+                except Exception as e:
+                    logger.warning(f"Failed to move item {item_id}: {e}")
                     
         if moved > 0:
             dest_name = self.tree.nodes[dest_id].name if dest_id else "root"

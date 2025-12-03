@@ -201,7 +201,7 @@ class TreeManager(ActionHandler):
             "Organization:",
             "  Tab/S-Tab  - Indent/outdent",
             "  Alt+↑/↓    - Move item up/down",
-            "  n          - New folder",
+            "  Insert     - New folder",
             "  r          - Rename",
             "  m          - Move to folder",
             "  o/O        - Sort order/Clear custom",

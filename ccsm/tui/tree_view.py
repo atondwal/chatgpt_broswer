@@ -239,13 +239,24 @@ class TreeView:
             
     def draw(self) -> None:
         """Draw the tree with enhanced visuals."""
+        # Update dimensions in case of resize
+        h, w = self.stdscr.getmaxyx()
+        self.width = w
+        self.height = h - 2
+
         # Clear area
-        for row in range(self.height):
-            self.stdscr.move(self.y + row, self.x)
-            self.stdscr.clrtoeol()
+        try:
+            for row in range(self.height):
+                self.stdscr.move(self.y + row, self.x)
+                self.stdscr.clrtoeol()
+        except curses.error:
+            pass
             
         if not self.tree_items:
-            self.stdscr.addstr(self.y + self.height // 2, self.x + 2, "Empty tree")
+            try:
+                self.stdscr.addstr(self.y + self.height // 2, self.x + 2, "Empty tree")
+            except curses.error:
+                pass
             return
             
         # Count items for header
@@ -255,9 +266,11 @@ class TreeView:
         # Draw header with counts
         header = f"📁 {folders} folders, 💬 {convs} conversations"
         if convs > 0 and self.show_dates:
-            # Add column headers for conversations
             header += " " * (max(0, 40 - len(header))) + "Modified    Created     Msgs"
-        self.stdscr.addstr(self.y, self.x, header, curses.A_BOLD)
+        try:
+            self.stdscr.addstr(self.y, self.x, header[:self.width - 1], curses.A_BOLD)
+        except curses.error:
+            pass
         
         # Draw tree items
         view_height = self.height - 1
@@ -350,13 +363,14 @@ class TreeView:
         max_width = self.width - 1
         if len(display) > max_width:
             display = display[:max_width - 3] + "..."
-            
+
         # Draw with highlighting
-        if is_selected:
-            # Draw full width highlight
-            self.stdscr.addstr(y_pos, self.x, " " * (self.width - 1), attr)
-            
-        self.stdscr.addstr(y_pos, self.x, display, attr)
+        try:
+            if is_selected:
+                self.stdscr.addstr(y_pos, self.x, " " * (self.width - 1), attr)
+            self.stdscr.addstr(y_pos, self.x, display, attr)
+        except curses.error:
+            pass
         
     def _has_sibling_below(self, idx: int, depth: int) -> bool:
         """Check if there's a sibling at the given depth below this item."""

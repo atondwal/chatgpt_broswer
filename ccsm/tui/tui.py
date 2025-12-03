@@ -43,7 +43,6 @@ class TUI:
         
         # Basic environment validation (skip for tests)
         if not skip_env_validation:
-            import sys
             if not sys.stdout.isatty():
                 raise RuntimeError("Environment not suitable for TUI operation")
         
@@ -140,24 +139,23 @@ class TUI:
             self.search_overlay.draw()
             
         # Status line
-        if self.status_message:
-            self.stdscr.addstr(height-1, 0, self.status_message[:width-1], curses.color_pair(2))
-        else:
-            # Show help with project info
-            multi_info = f" [{len(self.selection_manager.selected_items)} selected]" if self.selection_manager.selected_items else ""
-            visual_info = " [VISUAL]" if self.selection_manager.visual_mode else ""
-            search_info = f" [{len(self.search_manager.search_matches)} matches]" if self.search_manager.search_matches else ""
-            filter_info = f" [{len(self.filtered_conversations)} filtered]" if len(self.filtered_conversations) != len(self.conversations) else ""
-            
-            # Get project info for Claude projects
-            project_info = self._get_project_info()
-            
-            help_text = {
-                ViewMode.TREE: f"/:Search f:Filter Ctrl+F:FZF n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}{project_info}",
-                ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.search_manager.filter_mode else 
-                                "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"), 
-            }.get(self.current_view, "q:Quit")
-            self.stdscr.addstr(height-1, 0, help_text[:width-1])
+        try:
+            if self.status_message:
+                self.stdscr.addstr(height-1, 0, self.status_message[:width-1], curses.color_pair(2))
+            else:
+                multi_info = f" [{len(self.selection_manager.selected_items)} selected]" if self.selection_manager.selected_items else ""
+                visual_info = " [VISUAL]" if self.selection_manager.visual_mode else ""
+                search_info = f" [{len(self.search_manager.search_matches)} matches]" if self.search_manager.search_matches else ""
+                filter_info = f" [{len(self.filtered_conversations)} filtered]" if len(self.filtered_conversations) != len(self.conversations) else ""
+                project_info = self._get_project_info()
+                help_text = {
+                    ViewMode.TREE: f"/:Search f:Filter Ctrl+F:FZF n/N:Next/Prev x:Delete V:Visual u:Undo F1:Help{multi_info}{visual_info}{search_info}{filter_info}{project_info}",
+                    ViewMode.SEARCH: ("Type:Filter Ctrl+W:DelWord ESC:Cancel Enter:Apply" if self.search_manager.filter_mode else
+                                    "Type:Search Ctrl+G:Next Ctrl+W:DelWord ESC:Cancel Enter:Apply"),
+                }.get(self.current_view, "q:Quit")
+                self.stdscr.addstr(height-1, 0, help_text[:width-1])
+        except curses.error:
+            pass
             
         self.stdscr.refresh()
             
@@ -360,17 +358,6 @@ class TUI:
                     self.tree.save()
                 if action_result.refresh_tree:
                     self._refresh_tree()
-        elif key == ord('n'):  # New folder (legacy)
-            context = ActionContext(self, key, "new_folder")
-            action_result = self.operations_manager.handle("new_folder", context)
-            if action_result:
-                self.status_message = action_result.message
-                if action_result.save_tree:
-                    self.tree.save()
-                if action_result.refresh_tree:
-                    self._refresh_tree()
-                if action_result.clear_selection:
-                    self.selection_manager.clear_selection()
         elif key == ord('r'):  # Rename
             context = ActionContext(self, key, "rename")
             action_result = self.operations_manager.handle("rename", context)
