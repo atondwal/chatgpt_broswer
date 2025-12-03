@@ -190,6 +190,135 @@ def extract_claude_content(message_data: Dict[str, Any], for_title: bool = False
     return '\n'.join(parts) if parts else "[Empty message]"
 
 
+def render_message_detailed(entry: Dict[str, Any], fold_lines: int = 50) -> str:
+    """Render a JSONL entry as detailed plaintext for aligned view.
+
+    Args:
+        entry: Raw dict from JSONL line
+        fold_lines: Max lines before folding tool output
+
+    Returns:
+        Formatted plaintext string
+    """
+    entry_type = entry.get('type')
+
+    # Handle file-history-snapshot
+    if entry_type == 'file-history-snapshot':
+        return "--- [snapshot] ---"
+
+    # Handle summary entries
+    if entry_type == 'summary':
+        return "--- [summary] ---"
+
+    # Handle other non-message entries with a placeholder
+    if entry_type not in ['user', 'assistant']:
+        return f"--- [{entry_type or 'unknown'}] ---"
+
+    lines = []
+
+    # Header with role and timestamp
+    timestamp_str = entry.get('timestamp', '')
+    ts_display = ""
+    if timestamp_str:
+        ts = parse_timestamp(timestamp_str)
+        if ts:
+            ts_display = f" [{datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')}]"
+
+    if entry_type == 'user':
+        lines.append(f"## 👤 USER{ts_display}")
+    else:
+        lines.append(f"## 🤖 ASSISTANT{ts_display}")
+
+    message_data = entry.get('message', {})
+    content_list = message_data.get('content', [])
+
+    if isinstance(content_list, str):
+        lines.append(content_list)
+    elif isinstance(content_list, list):
+        for item in content_list:
+            if not isinstance(item, dict):
+                continue
+
+            item_type = item.get('type')
+
+            if item_type == 'text':
+                text = item.get('text', '')
+                if text:
+                    lines.append(text)
+
+            elif item_type == 'tool_use':
+                tool_name = item.get('name', 'unknown')
+                tool_input = item.get('input', {})
+                lines.append(f"[Tool: {tool_name}]")
+                if isinstance(tool_input, dict):
+                    for key, value in tool_input.items():
+                        value_str = str(value)
+                        if '\n' in value_str:
+                            lines.append(f"  {key}: |")
+                            for vline in value_str.split('\n'):
+                                lines.append(f"    {vline}")
+                        else:
+                            lines.append(f"  {key}: {value_str}")
+
+            elif item_type == 'tool_result':
+                content = item.get('content', '')
+                is_error = item.get('is_error', False)
+                prefix = "[Tool Error]" if is_error else "[Tool Result]"
+                lines.append(prefix)
+                if isinstance(content, str):
+                    content_lines = content.split('\n')
+                    if len(content_lines) > fold_lines:
+                        for cl in content_lines[:5]:
+                            lines.append(f"  {cl}")
+                        lines.append(f"  ({len(content_lines) - 10} lines folded)")
+                        for cl in content_lines[-5:]:
+                            lines.append(f"  {cl}")
+                    else:
+                        for cl in content_lines:
+                            lines.append(f"  {cl}")
+
+    # Also check toolUseResult field (for tool results stored separately)
+    tool_result = entry.get('toolUseResult')
+    if tool_result and isinstance(tool_result, dict):
+        stdout = tool_result.get('stdout', '')
+        stderr = tool_result.get('stderr', '')
+        if stdout:
+            stdout_lines = stdout.split('\n')
+            if len(stdout_lines) > fold_lines:
+                for sl in stdout_lines[:5]:
+                    lines.append(f"  {sl}")
+                lines.append(f"  ({len(stdout_lines) - 10} lines folded)")
+                for sl in stdout_lines[-5:]:
+                    lines.append(f"  {sl}")
+            else:
+                for sl in stdout_lines:
+                    lines.append(f"  {sl}")
+        if stderr:
+            lines.append("  [stderr]")
+            stderr_lines = stderr.split('\n')
+            for sl in stderr_lines[:10]:
+                lines.append(f"  {sl}")
+
+    return '\n'.join(lines)
+
+
+def load_raw_entries(file_path: str) -> List[Dict[str, Any]]:
+    """Load raw JSON entries from a JSONL file without parsing into Messages."""
+    entries = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except Exception as e:
+        logger.error(f"Error loading raw entries from {file_path}: {e}")
+    return entries
+
+
 def parse_timestamp(timestamp_str: str) -> Optional[float]:
     """Parse ISO timestamp to Unix timestamp."""
     if not timestamp_str:
@@ -348,5 +477,5 @@ def list_claude_projects() -> List[Dict[str, Any]]:
                 'last_modified': latest_time
             })
     
-    # Sort by last modified
-    return sorted(projects, key=lambda p: p.get('last_modified', 0), reverse=True)
+    # Sort by last modified (handle None values)
+    return sorted(projects, key=lambda p: p.get('last_modified') or 0, reverse=True)

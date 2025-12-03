@@ -6,7 +6,8 @@ import tempfile
 import subprocess
 from typing import Optional, Any
 from ccsm.tui.action_handler import ActionHandler, ActionContext, ActionResult
-from ccsm.core.exporter import export_conversation
+from ccsm.core.exporter import export_conversation, export_aligned
+from ccsm.core.claude_loader import load_raw_entries
 
 
 class TreeManager(ActionHandler):
@@ -239,40 +240,107 @@ class TreeManager(ActionHandler):
         
     def _open_in_editor(self, conversation) -> None:
         """Open conversation in user's editor."""
+        # Check if this is a Claude session with a file path
+        is_claude = (conversation.metadata and
+                     conversation.metadata.get('source') == 'claude' and
+                     conversation.metadata.get('file'))
+
+        if is_claude:
+            self._open_claude_aligned(conversation)
+        else:
+            self._open_markdown_editor(conversation)
+
+    def _open_claude_aligned(self, conversation) -> None:
+        """Open Claude session with aligned JSON + plaintext split view."""
+        import curses
+        from pathlib import Path
+
+        file_path = conversation.metadata['file']
+        entries = load_raw_entries(file_path)
+        if not entries:
+            self.tui.status_message = "No entries found in session file"
+            return
+
         try:
-            # Export conversation to temp file
+            with tempfile.TemporaryDirectory() as tmpdir:
+                json_content, txt_content = export_aligned(entries, fold_lines=50)
+
+                base_name = Path(file_path).stem
+                json_file = os.path.join(tmpdir, f"{base_name}.json")
+                txt_file = os.path.join(tmpdir, f"{base_name}.txt")
+
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    f.write(json_content)
+                with open(txt_file, 'w', encoding='utf-8') as f:
+                    f.write(txt_content)
+
+                # Suspend curses
+                curses.endwin()
+
+                try:
+                    # Open in nvim with split view
+                    cmd = [
+                        'nvim', '-O', json_file, txt_file,
+                        '-c', 'windo set scrollbind | windo set cursorbind',
+                        '-c', 'windo set nomodified'
+                    ]
+                    try:
+                        subprocess.run(cmd)
+                    except FileNotFoundError:
+                        cmd[0] = 'vim'
+                        subprocess.run(cmd)
+                finally:
+                    curses.doupdate()
+
+                # Check if modified and save to new file with new UUID
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    new_content = f.read()
+
+                if new_content != json_content:
+                    import uuid as uuid_mod
+                    orig_path = Path(file_path)
+                    new_uuid = str(uuid_mod.uuid4())
+                    out_path = orig_path.parent / f"{new_uuid}.jsonl"
+
+                    # Import compact function
+                    from ccsm.cli.cli import compact_json
+                    compact_json(json_file, str(out_path))
+                    self.tui.status_message = f"Saved: --resume {new_uuid[:8]}..."
+
+        except Exception as e:
+            import curses
+            curses.doupdate()
+            self.tui.status_message = f"Error: {e}"
+
+    def _open_markdown_editor(self, conversation) -> None:
+        """Open conversation as markdown in editor (non-Claude sessions)."""
+        import curses
+        temp_path = None
+
+        try:
             content = export_conversation(conversation, format="markdown")
-            
-            # Create temp file with .md extension for syntax highlighting
+
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
                 f.write(content)
                 temp_path = f.name
-            
-            # Get editor from environment or use sensible defaults
+
             editor = self._get_editor()
-            
-            # Suspend curses temporarily
-            import curses
             curses.endwin()
-            
+
             try:
-                # Open in editor
                 subprocess.run([editor, temp_path])
             finally:
-                # Resume curses
                 curses.doupdate()
-            
+
         except Exception as e:
-            # Resume curses if there was an error
-            import curses
             curses.doupdate()
             self.tui.status_message = f"Error opening editor: {e}"
         finally:
-            # Clean up temp file
-            try:
-                os.unlink(temp_path)
-            except:
-                pass
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
     
     def _get_editor(self) -> str:
         """Get the best available editor."""
